@@ -3,7 +3,9 @@
     "rootNamespace": "Nyonyo.Framework",
     "references": [
         "UnityEngine.UI",
-        "Unity.InputSystem"
+        "Unity.InputSystem",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

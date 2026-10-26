@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Nyonyo.Framework.Assets;
 using Nyonyo.Framework.UI;
 using UnityEngine.UI;
 
@@ -25,16 +26,39 @@ namespace Nyonyo.Framework.Editor.UI
         static readonly Regex s_namespacePattern = new(@"^\s*namespace\s+([\w.]+)");
 
         /// <summary>
-        /// <paramref name="baseType"/>(<see cref="PopupBase"/> 또는 <see cref="UIBase"/>)를 상속하는 새 스크립트를 만듭니다.
+        /// 프리팹 경로로 <see cref="PopupAttribute"/>에 넣을 경로와 로드 방식을 정합니다.
+        /// Resources 폴더 안이면 Resources 기준 경로(확장자 제외), 아니면 에셋 경로를 address로 쓰는 Addressables입니다.
         /// </summary>
-        public static string CreateScript(string className, Type baseType, string scriptNamespace, IReadOnlyList<UIBinding> bindings)
+        public static (string path, LoadType loadType) GetPopupLoadInfo(string prefabPath)
         {
+            const string resourcesFolder = "/Resources/";
+            var index = prefabPath.LastIndexOf(resourcesFolder, StringComparison.Ordinal);
+            if (index < 0)
+                return (prefabPath, LoadType.Addressables);
+
+            var relative = prefabPath.Substring(index + resourcesFolder.Length);
+            var extension = System.IO.Path.GetExtension(relative);
+            return (relative.Substring(0, relative.Length - extension.Length), LoadType.Resources);
+        }
+
+        /// <summary>
+        /// <paramref name="baseType"/>(<see cref="PopupBase"/> 또는 <see cref="UIBase"/>)를 상속하는 새 스크립트를 만듭니다.
+        /// 팝업이고 <paramref name="popupPath"/>가 있으면 <see cref="PopupAttribute"/>도 붙입니다.
+        /// </summary>
+        public static string CreateScript(string className, Type baseType, string scriptNamespace, IReadOnlyList<UIBinding> bindings,
+            string popupPath = null, LoadType popupLoadType = LoadType.Addressables)
+        {
+            var isPopup = typeof(PopupBase).IsAssignableFrom(baseType);
+            var addPopupAttribute = isPopup && !string.IsNullOrEmpty(popupPath);
+
             var usings = new SortedSet<string>(StringComparer.Ordinal)
             {
                 "UnityEngine",
                 typeof(Button).Namespace,
                 baseType.Namespace,
             };
+            if (addPopupAttribute)
+                usings.Add(typeof(LoadType).Namespace);
             foreach (var binding in bindings)
                 usings.Add(binding.FieldType.Namespace);
             usings.RemoveWhere(ns => string.IsNullOrEmpty(ns) || ns == scriptNamespace);
@@ -54,13 +78,15 @@ namespace Nyonyo.Framework.Editor.UI
 
             var member = classIndent + Indent;
             var body = member + Indent;
+            if (addPopupAttribute)
+                builder.AppendLine($"{classIndent}[Popup(Path = \"{popupPath}\", LoadType = LoadType.{popupLoadType})]");
             builder.AppendLine($"{classIndent}public class {className} : {baseType.Name}");
             builder.AppendLine($"{classIndent}{{");
             foreach (var line in RegionLines(member, bindings))
                 builder.AppendLine(line);
             builder.AppendLine();
 
-            if (typeof(PopupBase).IsAssignableFrom(baseType))
+            if (isPopup)
             {
                 builder.AppendLine($"{member}protected override void OnOpen()");
                 builder.AppendLine($"{member}{{");

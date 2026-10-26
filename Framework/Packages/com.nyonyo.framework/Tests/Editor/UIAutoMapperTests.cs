@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Nyonyo.Framework.Assets;
 using Nyonyo.Framework.Editor.UI;
 using Nyonyo.Framework.UI;
 using NUnit.Framework;
@@ -145,6 +146,34 @@ namespace Nyonyo.Framework.Editor.Tests
             StringAssert.Contains("public override void OnButtonEvent(Button button)", code);
             StringAssert.Contains("case \"BTN_Ok\":", code);
             StringAssert.DoesNotContain("namespace", code);
+        }
+
+        [Test]
+        public void CreateScript_PopupWithPath_AddsPopupAttribute()
+        {
+            var code = UIScriptGenerator.CreateScript("Test", typeof(PopupBase), "", new List<UIBinding>(),
+                "Assets/Popups/Test.prefab", LoadType.Addressables);
+
+            StringAssert.Contains("using Nyonyo.Framework.Assets;", code);
+            StringAssert.Contains("[Popup(Path = \"Assets/Popups/Test.prefab\", LoadType = LoadType.Addressables)]\r\npublic class Test : PopupBase".Replace("\r\n", System.Environment.NewLine), code);
+        }
+
+        [Test]
+        public void GetPopupLoadInfo_OutsideResources_UsesAddressablesWithAssetPath()
+        {
+            var (path, loadType) = UIScriptGenerator.GetPopupLoadInfo("Assets/Popups/PopupTest.prefab");
+
+            Assert.AreEqual("Assets/Popups/PopupTest.prefab", path);
+            Assert.AreEqual(LoadType.Addressables, loadType);
+        }
+
+        [Test]
+        public void GetPopupLoadInfo_InsideResources_UsesRelativePathWithoutExtension()
+        {
+            var (path, loadType) = UIScriptGenerator.GetPopupLoadInfo("Assets/Game/Resources/Popups/Loading.prefab");
+
+            Assert.AreEqual("Popups/Loading", path);
+            Assert.AreEqual(LoadType.Resources, loadType);
         }
 
         [Test]

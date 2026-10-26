@@ -248,6 +248,63 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
+        public void Show_LoadsPrefabFromPopupAttributeOnce_AndReleasesOnDispose()
+        {
+            var loader = new FakeAssetLoader();
+            loader.Assets["Popups/TestPopupB"] = _prefabB.gameObject;
+            var manager = new PopupManager(null, _parent.transform, null, loader);
+
+            var first = manager.Show<TestPopupB>();
+            var second = manager.Show<TestPopupB>();
+
+            Assert.IsNotNull(first);
+            Assert.AreNotSame(first, second);
+            CollectionAssert.AreEqual(new[] { "load:Popups/TestPopupB:Resources" }, loader.Log);
+
+            manager.Dispose();
+            CollectionAssert.Contains(loader.Log, "release:Popups/TestPopupB:Resources");
+        }
+
+        [Test]
+        public void ShowAsync_LoadsPrefabFromPopupAttribute()
+        {
+            var loader = new FakeAssetLoader();
+            loader.Assets["Popups/TestPopupB"] = _prefabB.gameObject;
+            var manager = new PopupManager(null, _parent.transform, null, loader);
+
+            var awaiter = manager.ShowAsync<TestPopupB>(UILayer.System).GetAwaiter();
+            Assert.IsTrue(awaiter.IsCompleted);
+            var popup = awaiter.GetResult();
+
+            Assert.AreEqual(manager.GetLayerRoot(UILayer.System), popup.transform.parent);
+            manager.Dispose();
+        }
+
+        [Test]
+        public void Show_WithoutAttributeOrRegistration_Throws()
+        {
+            var manager = new PopupManager(null, _parent.transform, null, new FakeAssetLoader());
+
+            var e = Assert.Throws<InvalidOperationException>(() => manager.Show<TestPopupA>());
+            StringAssert.Contains("Popup", e.Message);
+            manager.Dispose();
+        }
+
+        [Test]
+        public void Show_LoadedPrefabWithoutComponent_ThrowsAndReleases()
+        {
+            var loader = new FakeAssetLoader();
+            var wrongPrefab = new GameObject("Wrong", typeof(RectTransform));
+            _cleanup.Add(wrongPrefab);
+            loader.Assets["Popups/TestPopupB"] = wrongPrefab;
+            var manager = new PopupManager(null, _parent.transform, null, loader);
+
+            Assert.Throws<InvalidOperationException>(() => manager.Show<TestPopupB>());
+            CollectionAssert.Contains(loader.Log, "release:Popups/TestPopupB:Resources");
+            manager.Dispose();
+        }
+
+        [Test]
         public void DestroyedWithoutClose_IsRemovedFromOpenList()
         {
             var popup = _manager.Show<TestPopupA>();

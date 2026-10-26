@@ -201,7 +201,10 @@ namespace Nyonyo.Framework.Editor.UI
             return component;
         }
 
-        static string GetPrefabPath(UIBase target)
+        /// <summary>
+        /// <paramref name="target"/>이 프리팹 모드나 프리팹 에셋에 있으면 그 프리팹 경로, 씬 오브젝트면 null입니다.
+        /// </summary>
+        internal static string GetPrefabPath(UIBase target)
         {
             var stage = PrefabStageUtility.GetPrefabStage(target.gameObject);
             if (stage != null)

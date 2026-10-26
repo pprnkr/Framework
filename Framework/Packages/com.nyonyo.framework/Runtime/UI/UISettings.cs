@@ -1,11 +1,10 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace Nyonyo.Framework.UI
 {
     /// <summary>
-    /// <see cref="PopupManager"/> 설정입니다. 팝업 프리팹 목록과 화면 해상도 기준을 정합니다.
+    /// <see cref="PopupManager"/> 설정입니다. 화면 해상도 기준과 뒤로가기 처리를 정합니다.
+    /// 팝업 프리팹 경로는 각 팝업 클래스의 <see cref="PopupAttribute"/>로 정합니다.
     /// </summary>
     [CreateAssetMenu(menuName = "Nyonyo Framework/UI Settings", fileName = "UISettings")]
     public sealed class UISettings : ScriptableObject
@@ -18,10 +17,6 @@ namespace Nyonyo.Framework.UI
         [Range(0f, 1f)]
         [SerializeField] float _matchWidthOrHeight = 0.5f;
 
-        [Header("Popup")]
-        [Tooltip("Show<T>()로 띄울 팝업 프리팹입니다. 프리팹 루트에 PopupBase를 상속한 컴포넌트가 있어야 합니다.")]
-        [SerializeField] PopupBase[] _popupPrefabs = Array.Empty<PopupBase>();
-
         [Header("Input")]
         [Tooltip("뒤로가기 키(ESC, 안드로이드 뒤로가기)로 맨 위 팝업을 닫습니다.")]
         [SerializeField] bool _handleBackKey = true;
@@ -29,8 +24,6 @@ namespace Nyonyo.Framework.UI
         public Vector2 ReferenceResolution => _referenceResolution;
 
         public float MatchWidthOrHeight => _matchWidthOrHeight;
-
-        public IReadOnlyList<PopupBase> PopupPrefabs => _popupPrefabs;
 
         public bool HandleBackKey => _handleBackKey;
     }

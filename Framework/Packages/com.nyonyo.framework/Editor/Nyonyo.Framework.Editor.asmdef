@@ -3,7 +3,8 @@
     "rootNamespace": "Nyonyo.Framework.Editor",
     "references": [
         "Nyonyo.Framework",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.Addressables.Editor"
     ],
     "includePlatforms": [
         "Editor"

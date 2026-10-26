@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Threading;
+using Nyonyo.Framework.Assets;
 using Nyonyo.Framework.Events;
 using Nyonyo.Framework.Scenes;
 using UnityEngine;
@@ -13,10 +16,11 @@ using Object = UnityEngine.Object;
 namespace Nyonyo.Framework.UI
 {
     /// <summary>
-    /// <see cref="UILayer"/>별 Canvas를 만들고, 팝업 프리팹을 생성해서 층에 배치합니다.
+    /// <see cref="UILayer"/>별 Canvas를 만들고, 팝업 프리팹을 불러와 생성해서 층에 배치합니다.
     /// </summary>
     /// <remarks>
     /// 서비스로 등록해서 사용합니다. 등록한 뒤에는 <see cref="Instance"/>로 어디서든 꺼낼 수 있습니다.
+    /// 프리팹은 팝업 클래스의 <see cref="PopupAttribute"/>에 적힌 경로와 방식으로 처음 띄울 때 불러오고, 그 뒤로는 재사용합니다.
     /// Play 중에 씬에 EventSystem이 없으면 직접 만들어서 유지합니다. 그러니 씬에는 EventSystem을 두지 마세요.
     /// </remarks>
     public sealed class PopupManager : IDisposable
@@ -31,21 +35,28 @@ namespace Nyonyo.Framework.UI
         static readonly Predicate<PopupBase> s_isDestroyed = popup => popup == null;
 
         readonly Dictionary<Type, PopupBase> _prefabs = new();
+        readonly List<PopupAttribute> _loadedPrefabs = new();
         readonly RectTransform[] _layerRoots = new RectTransform[s_layerCount];
         readonly List<PopupBase>[] _openPopups = new List<PopupBase>[s_layerCount];
         readonly GameObject _root;
         readonly IDisposable _sceneLoadedSubscription;
+        readonly IAssetLoader _loader;
+        readonly bool _ownsLoader;
 
         /// <summary>
         /// 서비스로 등록된 PopupManager입니다. <c>Services.Get&lt;PopupManager&gt;()</c>와 같습니다.
         /// </summary>
         public static PopupManager Instance => Services.Get<PopupManager>();
 
-        /// <param name="settings">팝업 프리팹과 Canvas 설정입니다. null이면 기본값을 쓰고, 프리팹은 <see cref="RegisterPrefab"/>로 등록합니다.</param>
+        /// <param name="settings">Canvas와 뒤로가기 설정입니다. null이면 기본값을 씁니다.</param>
         /// <param name="parent">UI 루트를 붙일 부모입니다. 보통 <see cref="Bootstrapper.Root"/>를 넘깁니다. null이면 DontDestroyOnLoad 오브젝트로 만듭니다.</param>
         /// <param name="eventBus">넘기면 <see cref="SceneLoaded"/> 이벤트를 받아, 씬이 바뀔 때 팝업을 자동으로 닫습니다.</param>
-        public PopupManager(UISettings settings, Transform parent, IEventBus eventBus = null)
+        /// <param name="loader">팝업 프리팹을 불러올 로더입니다. 서비스로 등록한 <see cref="AssetLoader"/>를 넘기세요. null이면 직접 하나 만들어 씁니다.</param>
+        public PopupManager(UISettings settings, Transform parent, IEventBus eventBus = null, IAssetLoader loader = null)
         {
+            _ownsLoader = loader == null;
+            _loader = loader ?? new AssetLoader();
+
             var referenceResolution = settings != null ? settings.ReferenceResolution : new Vector2(1920, 1080);
             var match = settings != null ? settings.MatchWidthOrHeight : 0.5f;
 
@@ -61,14 +72,8 @@ namespace Nyonyo.Framework.UI
                 _openPopups[i] = new List<PopupBase>();
             }
 
-            if (settings != null)
-            {
-                foreach (var prefab in settings.PopupPrefabs)
-                    RegisterPrefab(prefab);
-
-                if (settings.HandleBackKey)
-                    _root.AddComponent<PopupBackKeyHandler>().Manager = this;
-            }
+            if (settings != null && settings.HandleBackKey)
+                _root.AddComponent<PopupBackKeyHandler>().Manager = this;
 
             if (eventBus != null)
                 _sceneLoadedSubscription = eventBus.Subscribe<SceneLoaded>(OnSceneLoaded);
@@ -82,7 +87,8 @@ namespace Nyonyo.Framework.UI
         public event Action BackKeyUnhandled;
 
         /// <summary>
-        /// 팝업 프리팹을 등록합니다. 같은 타입이 이미 등록되어 있으면 경고를 띄우고 무시합니다.
+        /// 이미 불러온 팝업 프리팹을 직접 등록합니다. 등록된 프리팹은 <see cref="PopupAttribute"/>보다 우선합니다.
+        /// 같은 타입이 이미 등록되어 있으면 경고를 띄우고 무시합니다.
         /// </summary>
         public void RegisterPrefab(PopupBase prefab)
         {
@@ -100,23 +106,37 @@ namespace Nyonyo.Framework.UI
         /// <summary>
         /// <typeparamref name="T"/> 팝업을 생성해서 띄웁니다. 같은 층에 이미 팝업이 있으면 그 위에 그려집니다.
         /// </summary>
+        /// <remarks>
+        /// 프리팹을 아직 불러오지 않았다면 그 자리에서 불러옵니다(Addressables는 WaitForCompletion).
+        /// WebGL이거나 프리팹이 커서 멈춤이 신경 쓰이면 <see cref="ShowAsync{T}"/>나 <see cref="PreloadAsync{T}"/>를 쓰세요.
+        /// </remarks>
         /// <param name="layer">팝업을 띄울 층입니다. null이면 프리팹에 설정된 층을 씁니다.</param>
         /// <returns>생성된 팝업입니다. 내용을 채우거나 닫힐 때까지 기다릴 때 씁니다.</returns>
         public T Show<T>(UILayer? layer = null) where T : PopupBase
         {
             if (!_prefabs.TryGetValue(typeof(T), out var prefab))
-                throw new InvalidOperationException(
-                    $"{typeof(T).Name} 팝업 프리팹이 등록되지 않았습니다. UISettings의 Popup Prefabs에 추가했는지 확인하세요.");
+            {
+                var info = GetPopupAttribute(typeof(T));
+                prefab = CachePrefab(typeof(T), info, _loader.Load<GameObject>(info.Path, info.LoadType));
+            }
 
-            var targetLayer = layer ?? prefab.Layer;
-            var popup = (T)Object.Instantiate(prefab, _layerRoots[(int)targetLayer], false);
-            popup.name = prefab.name;
-            popup.transform.SetAsLastSibling();
-
-            _openPopups[(int)targetLayer].Add(popup);
-            popup.Open(this, targetLayer);
-            return popup;
+            return Spawn<T>(prefab, layer);
         }
+
+        /// <summary>
+        /// 프리팹을 비동기로 불러온 뒤 <typeparamref name="T"/> 팝업을 띄웁니다.
+        /// </summary>
+        public async Awaitable<T> ShowAsync<T>(UILayer? layer = null, CancellationToken cancellationToken = default) where T : PopupBase
+        {
+            var prefab = await LoadPrefabAsync(typeof(T), cancellationToken);
+            return Spawn<T>(prefab, layer);
+        }
+
+        /// <summary>
+        /// <typeparamref name="T"/> 팝업 프리팹을 미리 불러 둡니다. 그 뒤의 <see cref="Show{T}"/>는 바로 뜹니다.
+        /// </summary>
+        public async Awaitable PreloadAsync<T>(CancellationToken cancellationToken = default) where T : PopupBase =>
+            await LoadPrefabAsync(typeof(T), cancellationToken);
 
         /// <summary>
         /// 열려 있는 <typeparamref name="T"/> 팝업 중 가장 위에 있는 것을 찾습니다. 없으면 null입니다.
@@ -192,10 +212,76 @@ namespace Nyonyo.Framework.UI
             return false;
         }
 
+        /// <summary>
+        /// 이벤트 구독을 끊고, <see cref="PopupAttribute"/>로 불러온 프리팹을 로더에 반환합니다.
+        /// </summary>
         public void Dispose()
         {
             _sceneLoadedSubscription?.Dispose();
             BackKeyUnhandled = null;
+
+            foreach (var info in _loadedPrefabs)
+                _loader.Release(info.Path, info.LoadType);
+            _loadedPrefabs.Clear();
+
+            if (_ownsLoader && _loader is IDisposable disposable)
+                disposable.Dispose();
+        }
+
+        async Awaitable<PopupBase> LoadPrefabAsync(Type type, CancellationToken cancellationToken)
+        {
+            if (_prefabs.TryGetValue(type, out var prefab))
+                return prefab;
+
+            var info = GetPopupAttribute(type);
+            var loaded = await _loader.LoadAsync<GameObject>(info.Path, info.LoadType, cancellationToken);
+
+            // 기다리는 동안 다른 호출이 먼저 불러왔다면, 이번에 불러온 것은 반환합니다.
+            if (_prefabs.TryGetValue(type, out prefab))
+            {
+                _loader.Release(info.Path, info.LoadType);
+                return prefab;
+            }
+
+            return CachePrefab(type, info, loaded);
+        }
+
+        PopupBase CachePrefab(Type type, PopupAttribute info, GameObject loaded)
+        {
+            var prefab = loaded.GetComponent(type) as PopupBase;
+            if (prefab == null)
+            {
+                _loader.Release(info.Path, info.LoadType);
+                throw new InvalidOperationException(
+                    $"{info.Path} 프리팹 루트에 {type.Name} 컴포넌트가 없습니다. 프리팹과 [Popup] 경로를 확인하세요.");
+            }
+
+            _prefabs.Add(type, prefab);
+            _loadedPrefabs.Add(info);
+            return prefab;
+        }
+
+        T Spawn<T>(PopupBase prefab, UILayer? layer) where T : PopupBase
+        {
+            var targetLayer = layer ?? prefab.Layer;
+            var popup = (T)Object.Instantiate(prefab, _layerRoots[(int)targetLayer], false);
+            popup.name = prefab.name;
+            popup.transform.SetAsLastSibling();
+
+            _openPopups[(int)targetLayer].Add(popup);
+            popup.Open(this, targetLayer);
+            return popup;
+        }
+
+        static PopupAttribute GetPopupAttribute(Type type)
+        {
+            var info = type.GetCustomAttribute<PopupAttribute>();
+            if (info == null || string.IsNullOrEmpty(info.Path))
+                throw new InvalidOperationException(
+                    $"{type.Name}에 [Popup(Path = ..., LoadType = ...)] 어트리뷰트가 없어서 프리팹을 불러올 수 없습니다. " +
+                    "어트리뷰트를 추가하거나 RegisterPrefab으로 등록하세요.");
+
+            return info;
         }
 
         internal void Remove(PopupBase popup)

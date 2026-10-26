@@ -216,6 +216,7 @@ UI를 5개 층(`UILayer`)으로 나눠 그립니다. 높은 층은 항상 낮은
 `PopupBase`를 상속한 컴포넌트를 프리팹 루트에 붙입니다. 프리팹 루트는 Canvas가 아니라 일반 RectTransform이어야 합니다. 직접 작성해도 되지만, 아래 [자동 매퍼](#ui-자동-매퍼-에디터)로 만드는 걸 추천합니다.
 
 ```csharp
+[Popup(Path = "Assets/Popups/PopupTest.prefab", LoadType = LoadType.Addressables)]
 public class PopupTest : PopupBase
 {
     protected override void OnOpen() { /* 생성 직후 초기화 */ }
@@ -232,6 +233,10 @@ public class PopupTest : PopupBase
 }
 ```
 
+- **프리팹 경로 `[Popup]`:** `PopupManager`가 이 값으로 프리팹을 불러옵니다.
+  - **Addressables:** `Path`는 address입니다. 기본 address는 에셋 경로입니다.
+  - **Resources:** `Path`는 Resources 폴더 기준 경로이고 확장자를 뺍니다(예: `Popups/Loading`).
+  - **자동 매퍼:** 자동 매퍼로 만들면 프리팹 위치에 맞춰 이 값이 자동으로 들어가고, Addressables에도 자동으로 등록됩니다.
 - **버튼 연결:** 버튼 클릭은 자동으로 연결되지 않습니다. Button의 **OnClick**에 `OnButtonEvent`를 연결하고 인자로 그 Button을 넘기세요. 자동 매퍼의 **Assign Object**를 쓰면 `BTN_` 버튼은 자동으로 연결됩니다.
 - **닫기 버튼:** OnClick에 `Close`를 직접 연결하거나 `OnButtonEvent`에서 `Close()`를 호출하세요.
 
@@ -247,7 +252,7 @@ public class PopupTest : PopupBase
 
 ### 2. 등록하기
 
-**Create > Nyonyo Framework > UI Settings**로 설정 에셋을 만들고, **Popup Prefabs**에 프리팹을 추가합니다. 그다음 Installer에서 등록합니다.
+**Create > Nyonyo Framework > UI Settings**로 설정 에셋을 만듭니다. 이 에셋에서 기준 해상도와 뒤로가기 처리를 정합니다. 그다음 Installer에서 등록합니다. 프리팹 목록은 따로 없고, 각 팝업 클래스의 `[Popup]`으로 불러옵니다.
 
 ```csharp
 [SerializeField] UISettings _uiSettings;
@@ -256,10 +261,15 @@ public override void Install(ServiceRegistry services)
 {
     var events = new EventBus();
     services.Register<IEventBus>(events);
-    services.Register(new PopupManager(_uiSettings, Bootstrapper.Root, events));
+
+    var assets = new AssetLoader();
+    services.Register<IAssetLoader>(assets);
+
+    services.Register(new PopupManager(_uiSettings, Bootstrapper.Root, events, assets));
 }
 ```
 
+- **프리팹 로드 시점:** 프리팹은 처음 `Show`할 때 불러오고 그 뒤로는 재사용합니다. `PopupManager`가 정리될 때 로더에 반환합니다.
 - **EventSystem:** Play 중에 EventSystem이 없으면 `PopupManager`가 직접 만들어서 유지합니다. 그러니 **씬에는 EventSystem을 두지 마세요.**
 - **씬 전환 시 자동 닫기:** `eventBus`를 넘기면 씬이 바뀔 때 `Close On Scene Change` 팝업을 자동으로 닫습니다.
 
@@ -272,6 +282,10 @@ var popup = PopupManager.Instance.Show<PopupTest>();
 // 층 직접 지정
 PopupManager.Instance.Show<PopupTest>(UILayer.System);
 
+// 비동기로 불러와서 띄우기, 미리 불러 두기
+var shop = await PopupManager.Instance.ShowAsync<PopupShop>();
+await PopupManager.Instance.PreloadAsync<PopupShop>();
+
 // 닫힐 때까지 기다리기 (확인창 응답 등)
 await popup.WaitUntilClosedAsync();
 
@@ -282,8 +296,79 @@ PopupManager.Instance.CloseAll(UILayer.Popup);  // 층을 생략하면 전부 �
 ```
 
 - **`PopupManager.Instance`:** `Services.Get<PopupManager>()`의 줄임말입니다. 싱글톤이 아니어서 도메인 리로드를 꺼도 안전합니다.
+- **`Show`와 `ShowAsync`:** 프리팹을 아직 불러오지 않았다면 `Show`는 그 자리에서 불러옵니다(Addressables의 `WaitForCompletion`). WebGL에서는 `WaitForCompletion`을 쓸 수 없으니 `ShowAsync`나 `PreloadAsync`를 쓰세요.
 - **뒤로가기 키:** ESC 키와 안드로이드 뒤로가기는 보이는 팝업 중 가장 위 팝업부터 `Back Key` 설정대로 처리합니다. `Hide()`로 숨긴 팝업은 건너뜁니다. 닫을 팝업이 없으면 `BackKeyUnhandled` 이벤트가 호출됩니다. 게임 종료 확인창을 띄울 때 쓰면 됩니다.
 - **팝업이 아닌 UI:** HUD처럼 팝업이 아닌 UI를 같은 층 규칙으로 그리려면 `GetLayerRoot(UILayer.Screen)`의 자식으로 붙이세요.
+
+## 에셋 로딩 (`Nyonyo.Framework.Assets`)
+
+Resources와 Addressables를 같은 인터페이스(`IAssetLoader`)로 불러옵니다. 게임 시작에 꼭 필요한 최소한의 에셋만 Resources에 두고, 나머지는 Addressables를 쓰는 것을 기본으로 합니다.
+
+| `LoadType` | 경로 |
+|---|---|
+| `Resources` | Resources 폴더 기준 경로, 확장자 제외 (예: `Popups/Loading`) |
+| `Addressables` | address (기본값은 에셋 경로, 예: `Assets/Popups/PopupTest.prefab`) |
+
+```csharp
+var assets = Services.Get<IAssetLoader>();
+var icon = await assets.LoadAsync<Sprite>("Assets/Icons/Gold.png", LoadType.Addressables);
+// ... 다 쓰면 반환
+assets.Release("Assets/Icons/Gold.png", LoadType.Addressables);
+```
+
+- **등록 순서:** `AssetLoader`를 서비스로 등록하고 `PopupManager`와 `SoundManager`에 넘겨서 함께 씁니다. 다른 서비스보다 먼저 등록하세요. 그래야 정리할 때 가장 나중에 정리됩니다.
+- **Release 규칙:** Addressables 에셋은 불러온 횟수만큼 `Release`해야 메모리에서 내려갑니다. Resources 에셋은 `Release`가 아무 일도 하지 않습니다.
+- **Addressables 패키지:** 이 패키지는 Addressables 4.1.1에 의존합니다. 설치하면 함께 설치됩니다.
+- **Play 모드에서 쓸 때:** 에디터 Play 모드에서는 Addressables Groups 창의 Play Mode Script가 **Use Asset Database**(기본값)여야 빌드 없이 불러올 수 있습니다.
+- **에셋 등록:** `AddressableEditorUtility.SetAddress(assetPath, address)`로 에셋을 Addressables에 등록할 수 있습니다(에디터 전용).
+
+## 사운드 (`Nyonyo.Framework.Audio`)
+
+BGM과 효과음을 이름으로 재생합니다. 이름은 `SoundSettings`의 경로 형식으로 바뀌어서 불러옵니다. 기본 형식은 `BGM/{0}`, `SFX/{0}`입니다.
+
+### 1. 사운드 준비
+
+1. 사운드 파일을 BGM 폴더와 효과음 폴더에 넣습니다. 기본 폴더는 `Assets/Sounds/BGM`, `Assets/Sounds/SFX`입니다.
+2. **Create > Nyonyo Framework > Sound Settings**로 설정 에셋을 만듭니다. 폴더를 바꿨다면 여기서 고칩니다.
+3. 메뉴 **Tools > Nyonyo Framework > Sound > Register Sounds to Addressables**를 실행합니다. 그러면 `Assets/Sounds/BGM/Title.wav`가 address `BGM/Title`로 등록됩니다.
+
+Load Type을 Resources로 바꾸면 사운드를 `Resources/BGM`, `Resources/SFX`에 두면 되고, 등록은 필요 없습니다.
+
+### 2. 등록하기
+
+```csharp
+[SerializeField] SoundSettings _soundSettings;
+
+services.Register(new SoundManager(_soundSettings, Bootstrapper.Root, assets));
+```
+
+### 3. 사용하기
+
+```csharp
+SoundManager.Instance.PlayBGM("Title");                      // BGM/Title
+SoundManager.Instance.PlayBGM("Battle", fadeSeconds: 1f);    // 1초 크로스페이드
+SoundManager.Instance.StopBGM(1f);
+
+SoundManager.Instance.PlaySFX("Hit");                        // SFX/Hit
+SoundManager.Instance.PlaySFX("Coin", 0.5f);                 // 이 효과음만 절반 볼륨
+
+// 볼륨 (0~1)
+SoundManager.Instance.MasterVolume = 0.8f;
+SoundManager.Instance.BgmVolume = 0.5f;
+SoundManager.Instance.SfxVolume = 1f;
+SoundManager.Instance.VolumeChanged += RefreshSliders;
+
+// 첫 재생 지연을 없애려면 미리 불러 두기, 다 쓰면 내리기
+await SoundManager.Instance.PreloadSFX("Hit", "Coin");
+SoundManager.Instance.UnloadAllSFX();
+```
+
+- **실제 볼륨:** BGM은 `MasterVolume × BgmVolume × 재생 volume`, 효과음은 `MasterVolume × SfxVolume × 재생 volume`입니다. 볼륨을 바꾸면 재생 중인 소리에도 바로 반영됩니다.
+- **동시 재생 수:** 효과음은 기본 8개까지 동시에 들립니다(`SoundSettings`의 SFX Channels). 다 차면 가장 오래된 효과음을 끊고 재생합니다.
+- **같은 BGM 재요청:** 이미 재생 중인 BGM을 다시 요청하면 처음부터 다시 틀지 않고 볼륨만 바꿉니다.
+- **메모리:** 효과음은 처음 재생할 때 불러와서 `UnloadSFX`/`UnloadAllSFX`를 부를 때까지 메모리에 둡니다. BGM은 다른 BGM으로 바뀌거나 멈추면 메모리에서 내립니다.
+- **볼륨 저장:** 볼륨 값은 아직 저장되지 않습니다. 저장 시스템을 만들 때 연동할 예정입니다.
+- **재생 함수와 await:** 재생 함수는 `Awaitable`을 돌려줍니다. 기다릴 필요가 없으면 그냥 호출하면 됩니다. 사운드를 찾지 못하면 예외 대신 에러 로그를 남깁니다.
 
 ## UI 자동 매퍼 (에디터)
 
@@ -320,6 +405,9 @@ PopupManager.Instance.CloseAll(UILayer.Popup);  // 층을 생략하면 전부 �
    - **Tools > Create UI Script > UI**: `UIBase`를 상속한 스크립트를 만듭니다. 팝업 안에서 쓰는 자식 UI용입니다.
 3. 저장 위치를 고릅니다. 파일 이름은 프리팹 이름이 기본값이고, 파일 이름이 곧 클래스 이름이 됩니다.
 4. 컴파일이 끝나면 스크립트가 프리팹 루트에 자동으로 붙고, 오브젝트도 변수에 자동으로 연결됩니다.
+5. **Popup**으로 만들면 프리팹 위치에 맞는 `[Popup(Path, LoadType)]`도 자동으로 들어갑니다.
+   - **Resources 폴더 밖:** Addressables 방식이 되고, 프리팹도 자동으로 등록됩니다.
+   - **Resources 폴더 안:** Resources 방식이 됩니다.
 
 ```csharp
 public class Test : PopupBase

@@ -2,6 +2,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using Nyonyo.Framework.Assets;
+using Nyonyo.Framework.Editor.Assets;
 using Nyonyo.Framework.UI;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -74,7 +76,18 @@ namespace Nyonyo.Framework.Editor.UI
             }
 
             var bindings = UIBindingCollector.Collect(root, settings);
-            var code = UIScriptGenerator.CreateScript(className, baseType, scriptNamespace, bindings);
+
+            // 팝업은 PopupManager가 불러올 수 있도록 [Popup] 경로를 넣고, Addressables 방식이면 프리팹을 등록합니다.
+            string popupPath = null;
+            var popupLoadType = LoadType.Addressables;
+            if (baseType == typeof(PopupBase))
+            {
+                (popupPath, popupLoadType) = UIScriptGenerator.GetPopupLoadInfo(prefabPath);
+                if (popupLoadType == LoadType.Addressables)
+                    AddressableEditorUtility.SetAddress(prefabPath, popupPath);
+            }
+
+            var code = UIScriptGenerator.CreateScript(className, baseType, scriptNamespace, bindings, popupPath, popupLoadType);
             UIAutoMapper.WriteScript(scriptPath, code);
             UIAutoMapper.SchedulePending(prefabPath, scriptPath, true);
             AssetDatabase.ImportAsset(scriptPath);
