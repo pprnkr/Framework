@@ -1,0 +1,41 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e7ce02b11899b845949783ac2ccdd18, type: 3}
+  m_Name: UIPrefixSettings
+  m_EditorClassIdentifier: Nyonyo.Framework.Editor::Nyonyo.Framework.Editor.UI.UIPrefixSettings
+  _scriptNamespace: 
+  _bindButtonClick: 1
+  _rules:
+  - _prefix: IMG_
+    _typeName: UnityEngine.UI.Image
+  - _prefix: RIMG_
+    _typeName: UnityEngine.UI.RawImage
+  - _prefix: TXT_
+    _typeName: TMPro.TextMeshProUGUI
+  - _prefix: BTN_
+    _typeName: UnityEngine.UI.Button
+  - _prefix: TGL_
+    _typeName: UnityEngine.UI.Toggle
+  - _prefix: SLD_
+    _typeName: UnityEngine.UI.Slider
+  - _prefix: SCR_
+    _typeName: UnityEngine.UI.ScrollRect
+  - _prefix: INP_
+    _typeName: TMPro.TMP_InputField
+  - _prefix: DRP_
+    _typeName: TMPro.TMP_Dropdown
+  - _prefix: RT_
+    _typeName: UnityEngine.RectTransform
+  - _prefix: GO_
+    _typeName: UnityEngine.GameObject
+  - _prefix: UI_
+    _typeName: Nyonyo.Framework.UI.UIBase

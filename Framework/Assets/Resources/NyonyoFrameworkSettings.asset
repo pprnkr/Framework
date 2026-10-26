@@ -12,4 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 69f0789111b2e4c4499fba105797823f, type: 3}
   m_Name: NyonyoFrameworkSettings
   m_EditorClassIdentifier: Nyonyo.Framework::Nyonyo.Framework.FrameworkSettings
-  _installers: []
+  _installers:
+  - {fileID: 11400000, guid: 2948ade524b795044a05d098e74ba9c0, type: 2}
