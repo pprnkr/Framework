@@ -6,7 +6,8 @@
         "UnityEditor.TestRunner",
         "Nyonyo.Framework",
         "Nyonyo.Framework.Editor",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [
         "Editor"
@@ -21,6 +22,12 @@
     "defineConstraints": [
         "UNITY_INCLUDE_TESTS"
     ],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "NYONYO_INPUT_SYSTEM"
+        }
+    ],
     "noEngineReferences": false
 }
