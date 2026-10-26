@@ -9,3 +9,4 @@
 - 부트스트랩: `Bootstrapper`, `FrameworkSettings`, `GameInstaller`.
 - 서비스 관리: `ServiceRegistry`, `Services`, `IInitializable`, `IAsyncInitializable`.
 - 에디터 메뉴: Tools > Nyonyo Framework > Create Settings.
+- 이벤트: `IEventBus`, `EventBus`, `IEvent`, `CancellationToken`으로 자동 해제하는 `Subscribe` 확장 메서드.

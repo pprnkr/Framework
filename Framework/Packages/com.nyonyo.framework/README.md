@@ -87,6 +87,60 @@ if (Services.TryGet(out IAudioService audio))
 - **비동기 초기화 기다리기:** 모든 서비스가 동기적으로 초기화되면 첫 씬의 `Awake`보다 먼저 준비가 끝납니다. 비동기 초기화가 있다면 `await Bootstrapper.WaitUntilReadyAsync();`로 기다린 뒤에 서비스를 쓰세요.
 - **종료 시점:** 게임 종료나 Play 모드 종료 때는 서비스가 씬 오브젝트보다 먼저 정리됩니다. 그래서 `OnDestroy`와 `OnDisable`에서는 `Services.TryGet`을 쓰세요.
 
+## 이벤트 (`Nyonyo.Framework.Events`)
+
+시스템끼리 직접 참조하지 않고 이벤트로 소식을 주고받습니다. 예를 들어 플레이어가 죽으면 UI, 사운드, 저장 시스템이 각자 `PlayerDied` 이벤트를 받아 반응합니다.
+
+### 1. 등록하기
+
+다른 서비스보다 **먼저** 등록하세요. 그래야 다른 서비스가 초기화할 때 구독할 수 있고, 정리할 때도 가장 나중에 정리됩니다.
+
+```csharp
+public override void Install(ServiceRegistry services)
+{
+    services.Register<IEventBus>(new EventBus());
+    // 다른 서비스 등록...
+}
+```
+
+### 2. 이벤트 정의하기
+
+이벤트는 `IEvent`를 구현한 struct로 만듭니다. 값을 바꿀 일이 없으니 `readonly struct`를 권장합니다.
+
+```csharp
+public readonly struct PlayerDied : IEvent
+{
+    public readonly int PlayerId;
+    public PlayerDied(int playerId) => PlayerId = playerId;
+}
+```
+
+### 3. 발행하고 구독하기
+
+```csharp
+// 발행
+Services.Get<IEventBus>().Publish(new PlayerDied(playerId));
+
+// MonoBehaviour에서 구독: 오브젝트가 파괴되면 자동으로 해제됩니다.
+void Start()
+{
+    Services.Get<IEventBus>().Subscribe<PlayerDied>(OnPlayerDied, destroyCancellationToken);
+}
+
+// 직접 해제하고 싶을 때: 반환된 구독 객체를 Dispose합니다.
+IDisposable _subscription;
+void OnEnable() => _subscription = Services.Get<IEventBus>().Subscribe<PlayerDied>(OnPlayerDied);
+void OnDisable() => _subscription?.Dispose();
+```
+
+### 규칙
+
+- **스레드:** 메인 스레드에서만 사용하세요.
+- **호출 순서와 예외:** 핸들러는 구독한 순서대로 호출됩니다. 핸들러 하나가 예외를 던져도 콘솔에 남기고 나머지 핸들러를 계속 호출합니다.
+- **발행 도중 구독 변경:** 새로 구독한 핸들러는 다음 발행부터 호출됩니다. 아직 호출되지 않은 핸들러를 해제하면, 이번 발행에서도 호출되지 않습니다.
+- **중복 구독:** 같은 핸들러를 두 번 구독하면 두 번 호출됩니다. C# `event`의 `+=`와 같습니다.
+- **메모리:** 이벤트를 발행할 때 메모리를 할당하지 않습니다.
+
 ## 개발
 
 이 패키지는 `Framework` Unity 프로젝트의 `Packages/` 폴더에 임베디드 패키지로 들어 있습니다. 프로젝트를 열면 바로 수정하고 테스트할 수 있습니다.

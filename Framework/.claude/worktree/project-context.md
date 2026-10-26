@@ -15,7 +15,9 @@
 | 원격 저장소 | `https://github.com/pprnkr/Framework.git`, 브랜치 `main` |
 | 셸 | Windows PowerShell 5.1 |
 
-- **git 미설치:** 이 PC에는 git이 설치되어 있지 않습니다(PATH에도 없고 `C:\Program Files\Git`에도 없음). 그래서 지금까지 만든 내용은 하나도 커밋되지 않았습니다. Git for Windows를 설치한 뒤 `git config --global user.name "Nyonyo"`를 설정하기로 했습니다.
+- **git:** `C:\Program Files\Git\cmd\git.exe` (2.56)에 설치되어 있습니다. 전역 설정은 `pprnkr <devilplu2@gmail.com>`이고, 사용자가 직접 설정했습니다. 저장소 루트가 한 단계 위라서 `git -C ..`로 실행합니다.
+  - Claude의 PowerShell에서는 PATH가 갱신되지 않을 수 있습니다. 그럴 때는 `$env:Path`를 Machine과 User 값으로 다시 읽어 옵니다.
+  - GitHub 인증(Git Credential Manager)은 로그인 창이 필요해서 Claude 터미널에서 처음 푸시할 수 없습니다. 사용자가 VS Code 터미널에서 한 번 로그인하면 이후에는 Claude도 푸시할 수 있습니다.
 - **Unity 검증 완료 (2026-10-26):** 컴파일 에러 없음, EditMode 테스트 16개 모두 통과, Play 모드에서 `[Nyonyo Framework]`가 DontDestroyOnLoad에 생성되는 것까지 확인했습니다.
   - 테스트 중 콘솔에 찍히는 `InvalidOperationException: dispose failed`는 `Dispose_WhenServiceThrows_ContinuesAndLogsException` 테스트가 의도한 로그입니다(`LogAssert.Expect`로 검증).
 
@@ -61,8 +63,8 @@ Packages/com.nyonyo.framework/
 |---|---|---|
 | 0 | 패키지 구조와 asmdef | 완료, Unity 검증됨 |
 | 1 | 부트스트랩과 서비스 관리 | 완료, Unity 검증됨 |
-| 2 | 이벤트 시스템 (타입 기반 EventBus 또는 SO 이벤트 채널) | **다음 작업** |
-| 3 | 씬 관리 (비동기 로드, 로딩 화면, 페이드) | 예정 |
+| 2 | 이벤트 시스템 (타입 기반 EventBus) | 완료 (Unity 검증 안 됨) |
+| 3 | 씬 관리 (비동기 로드, 로딩 화면, 페이드) | **다음 작업** |
 | 4 | UI 관리 (화면/팝업 스택, 뒤로가기) | 예정 |
 | 5 | 오디오 (BGM 크로스페이드, SFX 풀링, Mixer 볼륨) | 예정 |
 | 6 | 저장/로드 (JSON, 슬롯, 버전 마이그레이션) | 예정 |
@@ -104,9 +106,35 @@ Packages/com.nyonyo.framework/
 - `SubsystemRegistration`에서 static 값을 초기화합니다. Domain Reload를 끈 빠른 Play 모드에 대응하기 위해서입니다.
 - 설정 파일이 없으면 서비스 없이 시작하고 경고를 띄웁니다. 이 Framework 프로젝트에는 아직 설정 파일이 없습니다.
 
+## 구현 완료: 이벤트 시스템 (`Runtime/Events/`, 네임스페이스 `Nyonyo.Framework.Events`)
+
+| 타입 | 역할 |
+|---|---|
+| `IEvent` | 이벤트 표시용 인터페이스. 이벤트는 `struct`만 허용합니다(`where TEvent : struct, IEvent`). |
+| `IEventBus` / `EventBus` | `Subscribe`(구독 해제용 `IDisposable` 반환), `Unsubscribe`, `Publish`. `EventBus.Dispose`는 모든 구독을 해제합니다. |
+| `EventBusExtensions` | `Subscribe(handler, CancellationToken)`. MonoBehaviour의 `destroyCancellationToken`으로 자동 해제할 때 씁니다. |
+
+결정 사항은 다음과 같습니다.
+
+**등록 방식**
+- 프레임워크가 자동으로 등록하지 않습니다. 게임의 Installer가 다른 서비스보다 먼저 직접 등록합니다.
+- 나중에 프레임워크 기본 서비스를 한꺼번에 등록하는 기본 Installer를 둘지 검토합니다.
+
+**발행과 구독**
+- 발행 시 메모리 할당이 없습니다. 발행 중 해제된 핸들러는 자리만 null로 비워 두고, 발행이 끝난 뒤에 정리합니다.
+- 발행 중 새로 구독한 핸들러는 다음 발행부터 호출됩니다. 아직 호출되지 않은 핸들러를 해제하면 이번 발행에서도 건너뜁니다.
+- 같은 이벤트를 발행 도중에 다시 발행(중첩 발행)해도 동작합니다.
+- 핸들러가 예외를 던지면 `Debug.LogException`으로 남기고 나머지 핸들러를 계속 호출합니다.
+- 중복 구독은 C# event처럼 허용합니다. `Unsubscribe`는 마지막으로 구독한 것 하나만 제거합니다.
+
+**보류한 것**
+- 메인 스레드 전용입니다.
+- SO 이벤트 채널과 정적 단축 API(`Events.Publish`)는 필요할 때 추가합니다.
+
 ### 테스트 (`Tests/Editor/`)
 
-- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개.
+- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개(검증됨), `EventBusTests` 16개(Unity 검증 안 됨).
+- **의도된 에러 로그:** `EventBusTests`의 `handler failed` 예외 로그도 `LogAssert.Expect`로 검증하는 의도된 로그입니다.
 - **비동기 처리:** 테스트 서비스가 모두 즉시 완료되므로 `InitializeAsync().GetAwaiter()`로 동기 검증합니다. async 테스트 지원 여부에 의존하지 않으려고 이렇게 했습니다.
 - **Bootstrapper:** 자동 테스트가 없습니다. Play 모드에서 직접 확인해야 합니다.
 
