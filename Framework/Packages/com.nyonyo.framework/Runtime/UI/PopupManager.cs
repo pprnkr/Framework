@@ -116,36 +116,16 @@ namespace Nyonyo.Framework.UI
         /// 로드된 게임 어셈블리에서 <c>[Popup(Preload = true)]</c>가 붙은 팝업 타입을 찾습니다.
         /// Unity와 .NET 어셈블리, 그리고 에디터에서 함께 로드되는 테스트 어셈블리는 건너뜁니다.
         /// </summary>
-        internal static List<Type> FindPreloadPopupTypes()
-        {
-            var assemblies = new List<Assembly>();
-            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-            {
-                if (!IsEngineAssembly(assembly.GetName().Name) && !IsTestAssembly(assembly))
-                    assemblies.Add(assembly);
-            }
-
-            return FindPreloadPopupTypes(assemblies);
-        }
+        internal static List<Type> FindPreloadPopupTypes() => FindPreloadPopupTypes(GameAssemblies.Get());
 
         internal static List<Type> FindPreloadPopupTypes(IEnumerable<Assembly> assemblies)
         {
             var result = new List<Type>();
             foreach (var assembly in assemblies)
             {
-                Type[] types;
-                try
+                foreach (var type in GameAssemblies.GetTypes(assembly))
                 {
-                    types = assembly.GetTypes();
-                }
-                catch (ReflectionTypeLoadException e)
-                {
-                    types = e.Types;
-                }
-
-                foreach (var type in types)
-                {
-                    if (type == null || type.IsAbstract || !typeof(PopupBase).IsAssignableFrom(type))
+                    if (type.IsAbstract || !typeof(PopupBase).IsAssignableFrom(type))
                         continue;
 
                     var info = type.GetCustomAttribute<PopupAttribute>();
@@ -155,24 +135,6 @@ namespace Nyonyo.Framework.UI
             }
 
             return result;
-        }
-
-        static bool IsEngineAssembly(string name) =>
-            name == "mscorlib" || name == "netstandard" ||
-            name.StartsWith("System", StringComparison.Ordinal) ||
-            name.StartsWith("Unity", StringComparison.Ordinal) ||
-            name.StartsWith("Mono.", StringComparison.Ordinal) ||
-            name.StartsWith("nunit", StringComparison.OrdinalIgnoreCase);
-
-        static bool IsTestAssembly(Assembly assembly)
-        {
-            foreach (var reference in assembly.GetReferencedAssemblies())
-            {
-                if (reference.Name == "nunit.framework")
-                    return true;
-            }
-
-            return false;
         }
 
         /// <summary>
