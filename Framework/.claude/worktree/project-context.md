@@ -76,9 +76,12 @@ Packages/com.nyonyo.framework/
 | 4-2 | 에셋 로딩 (Resources/Addressables, `[Popup]` 어트리뷰트) | 완료 (스텁 컴파일만 확인, Unity 검증 안 됨) |
 | 5 | 사운드 (BGM 크로스페이드, 효과음 8채널, 볼륨 곱) | 완료 (스텁 컴파일만 확인, Unity 검증 안 됨) |
 | 6 | 저장/로드 (JSON, 슬롯, 버전 마이그레이션, 볼륨 저장 연동) + WebGL 호환 수정 | 완료 (스텁/플레이어 DLL 컴파일만 확인) |
-| 7 | 풀링, FSM, 타이머, 일시정지, 트윈 | **진행 중 (2026-10-27 사용자 요청: 남은 기능 전부 구현)** |
-| 8 | 입력, 2D 카메라, 데이터 테이블, 2D 공용 컴포넌트 | 예정 |
-| 9 | 디버그 도구 (로거, 치트 콘솔, 에디터 씬 전환 창) | 예정 |
+| 7 | 풀링, FSM, 타이머, 일시정지, 트윈 | 완료 (컴파일만 확인) |
+| 8 | 입력, 2D 카메라, 데이터 테이블, 2D 공용 컴포넌트 | 완료 (컴파일만 확인) |
+| 9 | 디버그 도구 (로거, 디버그 콘솔, 에디터 씬 전환 창) | 완료 (컴파일만 확인) |
+| - | Localization, Cinemachine 연동 | 보류: 패키지 도입 여부를 사용자가 정해야 함 |
+
+7~9단계는 2026-10-27 사용자 요청("처음 제안한 남은 기능 모두 구현")으로, 사용자가 자는 동안 한 번에 구현했습니다. 아직 Unity에서 Test Runner와 Play 모드 확인을 받지 않았습니다.
 
 그 밖에 추천해 둔 것들입니다.
 - **Input System 래퍼:** 액션맵 전환과 키 리바인딩
@@ -276,6 +279,41 @@ Packages/com.nyonyo.framework/
 
 **개발용 샘플:** `DevSampleSetup`이 사인파 WAV(DevBgmA, DevBgmB, Beep, Click)를 `Assets/Dev/Sounds`에 만들고, DevSoundSettings를 만들어 등록합니다. 팝업 프리팹도 Addressables에 등록합니다. `DevSceneSwitcher`에 BGM, SFX 버튼과 볼륨 슬라이더를 추가했습니다. DevInstaller는 AssetLoader를 서비스로 등록해서 PopupManager와 SoundManager가 함께 씁니다.
 
+## 구현 완료: 저장과 WebGL 대응 (2026-10-27)
+
+**저장 (`Runtime/Save/`, `Nyonyo.Framework.Save`)**
+- **기본 구조:** `SaveService`는 `static Instance`를 제공하고 concrete 타입으로 등록합니다. Save, Load, TryLoad, Exists, Delete가 `SaveScope`(Slot, Global)를 받습니다.
+- **키 형식:** 키는 `slot{n}.{key}`, `global.{key}` 형식입니다. 슬롯 메타 정보(`slot{n}.__meta`)에 키 목록과 마지막 저장 시각을 보관합니다. PlayerPrefs는 키 목록을 조회할 수 없기 때문입니다.
+- **저장소:** `FileSaveStorage`는 임시 파일(tmp)에 쓴 뒤 교체하고, 본 파일이 없으면 tmp를 읽습니다. `PlayerPrefsSaveStorage`는 매번 Save합니다. 기본 저장소는 `#if UNITY_WEBGL && !UNITY_EDITOR`이면 PlayerPrefs입니다.
+- **직렬화:** `JsonSaveSerializer`(JsonUtility)는 원시 타입, string, IEnumerable을 넘기면 ArgumentException을 던집니다.
+- **버전 변환:** `IVersionedSaveData`는 불러올 때 Migrate한 뒤 다시 저장합니다. 저장된 버전이 코드보다 높으면 경고만 남깁니다.
+- **볼륨 저장:** SoundManager는 `sound.volume` 전역 키로 저장합니다. 바뀐 뒤 0.5초 디바운스(realtime)를 두고, Dispose 때 flush합니다.
+
+**WebGL 대응**
+- **동기 로드 차단:** WebGL 빌드에서 `AssetLoader.Load`(Addressables 동기)는 NotSupportedException을 던지고, 에디터 빌드 대상이 WebGL이면 경고합니다.
+- **미리 불러오기:** `[Popup(Preload = true)]`이고, PopupManager는 `IAsyncInitializable`입니다(실패해도 LogException 후 계속).
+- **어셈블리 검색:** `GameAssemblies.Get()`은 Unity, System, nunit을 참조하는 테스트 어셈블리를 뺍니다. 에디터에서 Play할 때 테스트 팝업이 Preload되는 문제 때문입니다.
+- **검증:** 실제 WebGL 빌드는 못 했습니다(WebGL 모듈 미설치, 설치된 것은 Android/Windows). 대신 compile-check.ps1의 "WebGL player" 패스(Android IL2CPP 플레이어 엔진 DLL + `UNITY_WEBGL`, `UNITY_EDITOR` 없음)로 확인했습니다.
+
+## 구현 완료: 남은 기능 일괄 (2026-10-27, 사용자 취침 중)
+
+| 네임스페이스 | 핵심 타입과 결정 |
+|---|---|
+| `Pooling` | `PoolManager`(Spawn/Despawn/DespawnAfter/Prewarm/GetPool, 기본 보관 64), `PrefabPool`(자체 Stack, 넘치면 Destroy, 부모가 null이면 활성 씬으로 이동), `PooledObject`(자동 부착, OnDestroy 시 개수 보정), `IPoolable` |
+| `StateMachines` | `StateMachine<TState>`(함수 또는 `IState` 등록, 전환 큐로 Enter 안에서도 ChangeState 가능, 같은 상태 재요청은 무시하고 reenter 옵션 제공) |
+| `Timing` | 네임스페이스를 `Time`이라고 하면 `UnityEngine.Time`이 가려져서 `Timing`으로 정했습니다. `TimerService`(After/Every, owner 파괴 시 취소, 내부 `Tick` 테스트용 internal 생성자, `TimerRunner`는 별도 파일), `GameTimer`(이름 충돌 회피), `Cooldown`(시계 주입 가능), `PauseService`(요청자 집합, TimeScale, PauseAudio, `PauseChanged`, Dispose 시 timeScale 1) |
+| `Tweening` | `Tween.To`와 확장 메서드, `Ease` 12종. 대상이 파괴되면 조용히 멈춥니다. |
+| `Inputs` | `UnityEngine.Input`과 겹치지 않게 `Inputs`로 정했습니다. `#if NYONYO_INPUT_SYSTEM`입니다. `InputService`(기본값 `InputSystem.actions`, SwitchMap/PushMap/PopMap은 하나의 맵만 활성, `RebindAsync`는 ESC 취소, 리바인딩 JSON을 `input.bindings` 전역 키로 저장). 코드로 추가한 InputSystemUIInputModule은 DefaultInputActions를 써서 UI 맵 비활성과 무관합니다(소스로 확인). |
+| `Cameras` | `CameraFollow2D`(실행 순서 50, 자체 위치를 기억해서 덮어씀), `CameraShake`(실행 순서 100, 지난 프레임에 쓴 값과 비교해서 기준 위치를 정하므로 누적 없음), `CameraMath2D`(정적 함수, 테스트 대상) |
+| `Data` | `DataTable<TRow> : DataTableBase`(SO, id 인덱스는 NonSerialized), `CsvParser`, `CsvRowMapper`(머리글 대소문자 무시, `_필드`는 접두어 없이도 매칭, `#` 메모, 줄 번호 포함 FormatException). 에디터의 `CONTEXT/DataTableBase/Import CSV...`는 경로를 EditorPrefs(GUID 키)에 기억합니다. |
+| `Gameplay` | `Health`(IPoolable로 재사용 시 초기화, 시계 주입), `DamageDealer2D`(레이어 마스크, 자기 자신 제외, removeOnHit이면 PoolManager에 반환), `GroundCheck2D`(OverlapBox + ContactFilter, 자기 자신 제외), `SpriteFlash`(color 곱, realtime) |
+| `Logging` | `Log`/`LogChannel`. Debug와 Info는 `[Conditional(UNITY_EDITOR, DEVELOPMENT_BUILD, NYONYO_LOG)]`이고, MinimumLevel은 SubsystemRegistration에서 초기화합니다. |
+| `Debugging` | `DebugConsole`(`Debug.isDebugBuild`나 옵션일 때만 동작, `Application.logMessageReceived` 구독 후 Dispose에서 해제, IMGUI 뷰, 백쿼트 토글, 기본 명령 help/clear/timescale/scene), `DebugCommandRegistry`(Tokenize, typed 인자, 예외를 문자열로 반환), `[DebugCommand]` |
+| Editor | `Scenes/SceneSwitcherWindow`(Tools > Nyonyo Framework > Scene Switcher) |
+
+- **개발용 설치기:** DevInstaller가 모든 서비스를 등록합니다(등록 순서 예시). DevSceneSwitcher에 Pause, Timer, Console 버튼과 `[DebugCommand("dev.notice")]` 예제가 있습니다.
+- **경고 정책:** 패키지 코드는 CS0649 경고가 나지 않도록 인스펙터 필드에 명시적인 초기값을 둡니다.
+
 **외부 컴파일 검증**
 - Unity가 켜져 있으면 배치 모드를 쓸 수 없습니다. 그래서 scratchpad의 `compile-check.ps1`으로 Unity 내장 Roslyn(`Data/DotNetSdkRoslyn/csc.dll`)을 써서 5개 어셈블리를 컴파일합니다.
 - 참조에는 netstandard와 mscorlib shim, Managed/UnityEngine, ScriptAssemblies를 씁니다.
@@ -288,7 +326,8 @@ Packages/com.nyonyo.framework/
 
 ### 테스트 (`Tests/Editor/`)
 
-- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 21개, `UIBaseTests` 2개, `UIAutoMapperTests` 16개, `SoundManagerTests` 14개(Unity 검증 안 됨, 총 93개). `FakeAssetLoader`(Tests/Editor)는 로드와 반환을 기록하는 가짜 로더입니다. 실제 Addressables 로드와 `AssetLoader`는 자동 테스트가 없습니다.
+- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 25개, `UIBaseTests` 2개, `UIAutoMapperTests` 16개, `SoundManagerTests` 16개, `SaveServiceTests` 15개, `PoolManagerTests` 8개, `StateMachineTests` 7개, `TimingTests` 11개, `TweenTests` 5개, `InputServiceTests` 5개, `DataTableTests` 7개, `GameplayTests` 10개, `DebuggingTests` 8개(Unity 검증 안 됨, 총 175개).
+- **스크립트 실행 주의:** compile-check.ps1 실행 결과에 `| Select-Object -First N`을 붙이면 파이프라인이 멈춥니다. 그냥 실행하세요. `FakeAssetLoader`(Tests/Editor)는 로드와 반환을 기록하는 가짜 로더입니다. 실제 Addressables 로드와 `AssetLoader`는 자동 테스트가 없습니다.
 - **asmdef 참조 수정:** 테스트 asmdef에 빠져 있던 `UnityEngine.UI` 참조를 2026-10-27에 추가했습니다.. `FadeTransition`과 뒤로가기 키 입력은 자동 테스트가 없습니다. 테스트용 팝업은 `Tests/Editor/TestPopups/`에 둡니다(파일 하나에 클래스 하나).
 - **SceneService 테스트 방식:** 가짜 `ISceneLoader`와 `ISceneTransition`을 넣고, 즉시 완료되는 Awaitable로 동기 검증합니다.
 - **의도된 에러 로그:** `EventBusTests`의 `handler failed` 예외 로그도 `LogAssert.Expect`로 검증하는 의도된 로그입니다.

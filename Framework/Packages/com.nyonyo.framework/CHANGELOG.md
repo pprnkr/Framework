@@ -28,6 +28,18 @@
 - WebGL: `[Popup(Preload = true)]`로 게임 시작 때 팝업을 미리 불러옵니다(`PopupManager`가 `IAsyncInitializable`).
   WebGL 빌드에서 Addressables 동기 로드는 명확한 `NotSupportedException`을 던지고, 에디터의 빌드 대상이 WebGL이면 미리 경고합니다.
 
+- 오브젝트 풀링: `PoolManager`, `PrefabPool`, `IPoolable`, `PooledObject`.
+- 상태 머신: `StateMachine<TState>`, `IState`.
+- 타이밍: `TimerService`, `GameTimer`, `Cooldown`, `PauseService`(`PauseChanged` 이벤트).
+- 트윈: `Tween`(To, Fade, Move, Scale, AnchoredMove, Color), `Ease`, `Easing`.
+- 입력: `InputService`(액션맵 전환과 스택, 리바인딩과 저장). Input System이 있을 때만 컴파일.
+- 2D 카메라: `CameraFollow2D`, `CameraShake`, `CameraMath2D`.
+- 데이터: `DataTable<TRow>`, `IDataRow`, `CsvParser`, `CsvRowMapper`, 에디터 Import CSV / Reimport CSV.
+- 2D 게임플레이: `Health`, `DamageDealer2D`, `GroundCheck2D`, `SpriteFlash`, `DamageInfo`.
+- 로그: `Log`, `LogChannel`, `LogLevel`.
+- 디버그: `DebugConsole`, `DebugCommandRegistry`, `[DebugCommand]`.
+- 에디터: Tools > Nyonyo Framework > Scene Switcher.
+
 ### Changed
 - `UISettings`의 Popup Prefabs 목록을 제거했습니다. 팝업 프리팹은 `[Popup]` 어트리뷰트로 불러옵니다.
 - `PopupManager` 생성자에 `IAssetLoader` 인자를 추가했습니다.

@@ -297,6 +297,7 @@ PopupManager.Instance.CloseAll(UILayer.Popup);  // 층을 생략하면 전부 �
 
 - **`PopupManager.Instance`:** `Services.Get<PopupManager>()`의 줄임말입니다. 싱글톤이 아니어서 도메인 리로드를 꺼도 안전합니다.
 - **`Show`와 `ShowAsync`:** 프리팹을 아직 불러오지 않았다면 `Show`는 그 자리에서 불러옵니다(Addressables의 `WaitForCompletion`). WebGL에서는 `WaitForCompletion`을 쓸 수 없으니 `ShowAsync`나 `PreloadAsync`를 쓰세요.
+- **미리 불러오기:** `[Popup(..., Preload = true)]`를 주면 게임 시작(부트스트랩 초기화) 때 프리팹을 미리 불러옵니다. 그래서 WebGL에서도 `Show`로 바로 띄울 수 있습니다. 비동기 초기화이므로, 첫 씬에서 바로 띄울 때는 `await Bootstrapper.WaitUntilReadyAsync()` 뒤에 띄우세요.
 - **뒤로가기 키:** ESC 키와 안드로이드 뒤로가기는 보이는 팝업 중 가장 위 팝업부터 `Back Key` 설정대로 처리합니다. `Hide()`로 숨긴 팝업은 건너뜁니다. 닫을 팝업이 없으면 `BackKeyUnhandled` 이벤트가 호출됩니다. 게임 종료 확인창을 띄울 때 쓰면 됩니다.
 - **팝업이 아닌 UI:** HUD처럼 팝업이 아닌 UI를 같은 층 규칙으로 그리려면 `GetLayerRoot(UILayer.Screen)`의 자식으로 붙이세요.
 
@@ -367,8 +368,205 @@ SoundManager.Instance.UnloadAllSFX();
 - **동시 재생 수:** 효과음은 기본 8개까지 동시에 들립니다(`SoundSettings`의 SFX Channels). 다 차면 가장 오래된 효과음을 끊고 재생합니다.
 - **같은 BGM 재요청:** 이미 재생 중인 BGM을 다시 요청하면 처음부터 다시 틀지 않고 볼륨만 바꿉니다.
 - **메모리:** 효과음은 처음 재생할 때 불러와서 `UnloadSFX`/`UnloadAllSFX`를 부를 때까지 메모리에 둡니다. BGM은 다른 BGM으로 바뀌거나 멈추면 메모리에서 내립니다.
-- **볼륨 저장:** 볼륨 값은 아직 저장되지 않습니다. 저장 시스템을 만들 때 연동할 예정입니다.
+- **볼륨 저장:** 생성자에 `SaveService`를 넘기면 볼륨을 전역 데이터(`sound.volume`)로 저장하고 다음 실행 때 불러옵니다. 마지막으로 바꾸고 0.5초 뒤에 저장합니다(실시간 기준이라 일시정지 중에도 저장됨).
 - **재생 함수와 await:** 재생 함수는 `Awaitable`을 돌려줍니다. 기다릴 필요가 없으면 그냥 호출하면 됩니다. 사운드를 찾지 못하면 예외 대신 에러 로그를 남깁니다.
+
+## 저장 (`Nyonyo.Framework.Save`)
+
+데이터를 키 단위로 저장합니다. 진행 데이터는 세이브 슬롯(`SaveScope.Slot`)에, 설정은 전역(`SaveScope.Global`)에 둡니다.
+
+```csharp
+services.Register(new SaveService());   // 기본: WebGL은 PlayerPrefs, 그 밖은 persistentDataPath/Saves 파일
+
+[Serializable]
+public class PlayerData { public int gold; public string nickname = ""; }
+
+var save = SaveService.Instance;
+save.CurrentSlot = 1;
+save.Save("player", data);                                 // slot1.player
+var loaded = save.Load("player", new PlayerData());        // 없으면 기본값
+save.Save("settings", settings, SaveScope.Global);         // 슬롯과 상관없이 하나
+
+save.SlotExists(1);
+save.TryGetSlotInfo(1, out var info);                      // info.LastSavedUtc, info.KeyCount
+save.DeleteSlot(1);
+```
+
+- **저장 시점:** `Save`는 호출 즉시 기록합니다. WebGL은 게임 종료 시점을 알 수 없으므로, 종료할 때 한꺼번에 저장하는 방식에 기대지 마세요.
+- **데이터 형식:** 데이터는 JsonUtility로 저장합니다. `[Serializable]` 클래스의 public 필드나 `[SerializeField]` 필드만 저장되고, Dictionary와 프로퍼티는 저장되지 않습니다. int, string, 배열은 클래스 필드로 감싸세요(그대로 넘기면 예외).
+- **버전 관리:** 데이터 구조가 바뀌면 `IVersionedSaveData`를 구현하세요. 예전 데이터를 불러올 때 `Migrate(fromVersion)`가 호출되고, 최신 버전으로 다시 저장됩니다.
+- **안전성:** 파일 저장소는 임시 파일에 쓴 뒤 바꿔치기합니다. 그래서 쓰는 도중 꺼져도 데이터가 깨지지 않습니다. 손상된 데이터는 에러 로그를 남기고 기본값을 돌려줍니다.
+- **키 규칙:** 키에는 영문, 숫자, `_ . -`만 쓸 수 있습니다. WebGL의 PlayerPrefs는 전체 1MB 정도로 제한됩니다.
+- **저장소 바꾸기:** 암호화나 클라우드 저장이 필요하면 `ISaveStorage`를 구현해서 넘기세요.
+
+## 오브젝트 풀링 (`Nyonyo.Framework.Pooling`)
+
+```csharp
+services.Register(new PoolManager(Bootstrapper.Root));
+
+var bullet = PoolManager.Instance.Spawn(bulletPrefab, muzzle.position, muzzle.rotation);
+PoolManager.Instance.Despawn(bullet);
+_ = PoolManager.Instance.DespawnAfter(effect, 1f);
+PoolManager.Instance.Prewarm(bulletPrefab, 20);
+```
+
+- **상태 초기화:** 재사용되는 오브젝트의 상태는 `IPoolable.OnSpawned()`에서 초기화하세요. `Health`는 꺼낼 때 체력이 자동으로 다시 채워집니다.
+- **씬과의 관계:** `Spawn`할 때 부모를 정하지 않으면 현재 씬에 둡니다. 그래서 씬이 바뀌면 함께 파괴되고, 풀 개수도 자동으로 맞춰집니다.
+- **보관 한도:** 풀마다 쉬고 있는 인스턴스는 기본 64개까지 보관합니다. 넘치면 Destroy합니다.
+
+## 상태 머신 (`Nyonyo.Framework.StateMachines`)
+
+```csharp
+_fsm = new StateMachine<PlayerState>()
+    .Add(PlayerState.Idle, update: dt => { if (moving) _fsm.ChangeState(PlayerState.Run); })
+    .Add(PlayerState.Run, enter: () => animator.Play("Run"))
+    .Add(PlayerState.Jump, new JumpState(this));   // IState 클래스
+_fsm.ChangeState(PlayerState.Idle);
+
+void Update() => _fsm.Update(Time.deltaTime);
+```
+
+- **Update 호출:** 상태 머신은 Unity 오브젝트가 아니라서, `Update`를 직접 불러 줘야 합니다.
+- **안전한 전환:** Enter나 Exit 안에서 `ChangeState`를 불러도 안전합니다.
+- **기타 기능:** `TimeInState`, `PreviousState`, `StateChanged` 이벤트를 제공합니다.
+
+## 타이머와 일시정지 (`Nyonyo.Framework.Timing`)
+
+```csharp
+services.Register(new PauseService(events));
+services.Register(new TimerService(Bootstrapper.Root));
+
+TimerService.Instance.After(2f, Respawn, owner: this);           // owner가 파괴되면 자동 취소
+var tick = TimerService.Instance.Every(0.5f, Regenerate);
+tick.Cancel();
+
+readonly Cooldown _dash = new(1.5f);
+if (_dash.TryUse()) Dash();                                      // _dash.Progress로 게이지 표시
+
+PauseService.Instance.Pause(this);      // 설정 팝업 열 때
+PauseService.Instance.Resume(this);     // 닫을 때
+PauseService.Instance.TimeScale = 0.3f; // 슬로 모션
+```
+
+- **일시정지 요청 관리:** 여러 곳에서 동시에 멈춰도 요청한 쪽이 모두 Resume해야 다시 흐릅니다. 그러니 `Time.timeScale`을 직접 바꾸지 마세요.
+- **일시정지 중 동작:** 일시정지 중에도 움직여야 하는 UI 연출과 타이머는 unscaled time을 쓰세요.
+- **소리:** 기본적으로 일시정지 중에도 BGM은 계속 나옵니다. 소리까지 멈추려면 `PauseAudio = true`로 설정하세요.
+
+## 트윈 (`Nyonyo.Framework.Tweening`)
+
+```csharp
+await panel.FadeAsync(1f, 0.3f, unscaledTime: true);
+await icon.transform.ScaleAsync(Vector3.one * 1.2f, 0.15f, Ease.OutBack);
+await rect.AnchoredMoveAsync(new Vector2(0, 200), 0.4f, Ease.OutCubic);
+await Tween.To(0f, 100f, 1f, v => label.text = $"{v:0}");
+```
+
+- **용도:** 외부 라이브러리 없이 UI 연출 정도를 처리하는 가벼운 도구입니다. 대상이 파괴되면 조용히 멈추고, `CancellationToken`으로 취소할 수 있습니다.
+- **복잡한 연출:** 오브젝트 수백 개를 동시에 움직이는 연출에는 PrimeTween이나 DOTween을 권합니다.
+
+## 입력 (`Nyonyo.Framework.Inputs`, Input System 필요)
+
+```csharp
+services.Register(new InputService(save: save, initialMap: "Player"));   // 프로젝트 전체 액션 사용
+
+var input = InputService.Instance;
+if (input.GetAction("Jump").WasPressedThisFrame()) Jump();
+input.PushMap("UI");     // 팝업 열 때
+input.PopMap();          // 닫을 때
+
+var changed = await input.RebindAsync(input.GetAction("Jump"));   // 다음에 누른 키로 변경, ESC 취소
+label.text = input.GetBindingDisplay(input.GetAction("Jump"));
+input.ResetBindings();
+```
+
+- **액션맵:** 한 번에 하나의 액션맵만 켭니다.
+- **리바인딩 저장:** `SaveService`를 넘기면 리바인딩 결과를 저장하고 불러옵니다.
+- **UI 클릭:** `PopupManager`가 만드는 EventSystem의 UI 입력 모듈은 별도의 기본 UI 액션을 씁니다. 그래서 액션맵을 바꿔도 UI 클릭에는 영향이 없습니다.
+
+## 2D 카메라 (`Nyonyo.Framework.Cameras`)
+
+| 컴포넌트 | 기능 |
+|---|---|
+| `CameraFollow2D` | 대상을 부드럽게 따라갑니다(SmoothDamp). 데드존, 이동 영역 제한(Collider2D 또는 `SetBounds`), `SnapToTarget()`을 지원합니다. |
+| `CameraShake` | 흔들림 세기(trauma)를 누적하는 방식으로 흔듭니다. `CameraShake.ShakeMain(0.4f)`로 메인 카메라를 흔들 수 있습니다. 따라가기와 함께 써도 위치가 밀리지 않습니다. |
+| `CameraMath2D` | 영역 제한과 데드존 계산을 담은 정적 함수입니다. |
+
+픽셀 아트라면 URP의 **Pixel Perfect Camera** 컴포넌트를 함께 쓰세요.
+
+## 데이터 테이블 (`Nyonyo.Framework.Data`)
+
+```csharp
+[Serializable]
+public class ItemRow : IDataRow
+{
+    public string id; public string name; public int price; public ItemGrade grade;
+    public string Id => id;
+}
+
+[CreateAssetMenu(menuName = "MyGame/Item Table")]
+public class ItemTable : DataTable<ItemRow> { }
+
+var potion = itemTable.Get("potion_small");
+```
+
+- **CSV 가져오기:** 테이블 에셋을 우클릭(인스펙터 ⋮)하고 **Import CSV...**를 선택해서 엑셀이나 구글 시트에서 내보낸 CSV를 가져옵니다. **Reimport CSV**는 마지막 파일을 다시 읽습니다.
+- **머리글 규칙:** 머리글은 필드 이름과 맞춥니다(대소문자 무시, `_hp`는 `hp`로도 맞음). `#`로 시작하는 열과 행은 메모로 보고 건너뜁니다.
+- **지원 타입:** string, int, long, float, double, bool(true/1/yes/o), enum을 지원합니다. 형식이 틀리면 몇 번째 줄인지 알려 주고, 테이블은 바꾸지 않습니다.
+
+## 2D 공용 컴포넌트 (`Nyonyo.Framework.Gameplay`)
+
+| 컴포넌트 | 기능 |
+|---|---|
+| `Health` | 피해(`TakeDamage`), 회복(`Heal`), 사망을 처리하고, 피격 후 무적 시간을 둡니다. 이벤트는 `Damaged`, `Healed`, `Died`, `Changed`입니다. 죽어도 파괴하지 않습니다. |
+| `DamageDealer2D` | 닿은 대상의 Health에 피해를 줍니다(레이어 필터, 자기 자신 제외). 총알처럼 맞으면 사라지게(풀 반환) 할 수 있습니다. |
+| `GroundCheck2D` | 발밑 땅을 확인합니다(`IsGrounded`, `Landed`, `LeftGround`). 선택하면 씬 뷰에 확인 영역이 보입니다. |
+| `SpriteFlash` | 피격 시 스프라이트 색을 잠깐 바꿉니다. 같은 오브젝트에 Health가 있으면 자동으로 동작합니다. |
+
+## 로그 (`Nyonyo.Framework.Logging`)
+
+```csharp
+Log.Info($"스테이지 {stage} 시작");
+static readonly LogChannel s_log = Log.Channel("Battle");
+s_log.Debug($"데미지 {damage}");     // [Battle] 데미지 10
+Log.MinimumLevel = LogLevel.Warning;
+```
+
+`Log.Debug`와 `Log.Info`는 에디터, Development Build, `NYONYO_LOG` 심볼이 있을 때만 컴파일됩니다. 릴리스 빌드에서는 문자열을 만드는 비용까지 사라집니다.
+
+## 디버그 콘솔 (`Nyonyo.Framework.Debugging`)
+
+```csharp
+services.Register(new DebugConsole(Bootstrapper.Root));   // 에디터와 Development Build에서만 동작
+
+[DebugCommand("gold", "골드를 더합니다")]
+static string AddGold(int amount = 1000) { Wallet.Gold += amount; return $"골드: {Wallet.Gold}"; }
+```
+
+- **열고 닫기:** 게임 중 <code>`</code> 키로 엽니다. 모바일에서는 숨은 버튼 등에서 `DebugConsole.Instance.Toggle()`을 부르세요.
+- **명령 등록:** `[DebugCommand]`가 붙은 static 메서드는 자동으로 등록됩니다. 인자는 string, int, float, bool, enum 등을 쓸 수 있고, 기본값이 있으면 생략할 수 있습니다.
+- **기본 명령:** `help`, `clear`, `timescale <값>`, `scene <이름>`입니다.
+
+## 에디터 도구
+
+| 메뉴 | 기능 |
+|---|---|
+| Tools > Nyonyo Framework > Create Settings | 부트스트랩 설정 파일 만들기 |
+| Tools > Nyonyo Framework > Scene Switcher | 씬 목록 창. 클릭으로 열기, Play 버튼으로 바로 실행 |
+| Tools > Nyonyo Framework > Sound > Register Sounds to Addressables | 사운드 폴더를 Addressables에 등록 |
+| Tools > Create UI Script > Popup / UI | UI 스크립트 자동 생성 (아래 자동 매퍼) |
+| 데이터 테이블 우클릭 > Import CSV... / Reimport CSV | CSV 가져오기 |
+
+## WebGL
+
+이 패키지의 런타임 코드는 WebGL에서 동작합니다. 스레드와 Task를 쓰지 않고 Unity `Awaitable`만 씁니다. 대신 아래 사항을 지켜 주세요.
+
+| 항목 | 내용 |
+|---|---|
+| Addressables 동기 로드 | WebGL은 `WaitForCompletion`을 지원하지 않습니다. `PopupManager.Show`로 바로 띄울 Addressables 팝업은 `[Popup(Preload = true)]`로 두거나 `ShowAsync`를 쓰세요. 동기 로드를 시도하면 원인을 알려 주는 `NotSupportedException`이 납니다. 에디터의 빌드 대상이 WebGL이면 미리 경고합니다. |
+| 종료 처리 | 탭을 닫으면 `Application.quitting`이 호출되지 않습니다. 저장은 `Save` 호출 즉시 기록되고, 볼륨과 리바인딩도 바뀔 때 저장되므로 따로 처리할 필요는 없습니다. |
+| 저장소 | 기본 저장소는 PlayerPrefs(브라우저 IndexedDB)이고, 전체 1MB 정도로 제한됩니다. |
+| 소리 | 브라우저 정책상 사용자가 처음 클릭하거나 키를 누르기 전에는 소리가 나지 않습니다. 타이틀 화면에서 "터치해서 시작" 같은 입력을 받은 뒤 BGM을 트세요. |
+| ESC 키 | 브라우저 전체 화면에서는 ESC가 전체 화면 해제에 먼저 쓰입니다. 뒤로가기 동작은 다른 키나 버튼으로도 열 수 있게 하세요. |
 
 ## UI 자동 매퍼 (에디터)
 

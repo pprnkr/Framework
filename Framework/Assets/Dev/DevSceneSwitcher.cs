@@ -1,8 +1,11 @@
 using System.IO;
 using Nyonyo.Framework;
 using Nyonyo.Framework.Audio;
+using Nyonyo.Framework.Debugging;
 using Nyonyo.Framework.Events;
+using Nyonyo.Framework.Logging;
 using Nyonyo.Framework.Save;
+using Nyonyo.Framework.Timing;
 using Nyonyo.Framework.Scenes;
 using Nyonyo.Framework.UI;
 using UnityEngine;
@@ -51,8 +54,32 @@ namespace Nyonyo.Dev
             DrawSound(sound);
             GUILayout.Space(10);
             DrawSave(save);
+            GUILayout.Space(10);
+            DrawTools();
             GUILayout.EndArea();
         }
+
+        void DrawTools()
+        {
+            if (Services.TryGet(out PauseService pause) &&
+                GUILayout.Button(pause.IsPaused ? "Resume (timeScale 1)" : "Pause (timeScale 0)"))
+            {
+                if (pause.IsPaused)
+                    pause.Resume(this);
+                else
+                    pause.Pause(this);
+            }
+
+            if (Services.TryGet(out TimerService timers) && GUILayout.Button("Timer: log after 1s"))
+                timers.After(1f, () => Log.Info("[Dev] Timer fired"), owner: this);
+
+            if (Services.TryGet(out DebugConsole console) && GUILayout.Button("Toggle Console (` key)"))
+                console.Toggle();
+        }
+
+        [DebugCommand("dev.notice", "띠알람을 띄웁니다. 예: dev.notice \"Hello\"")]
+        static void ShowNotice(string message = "Notice from console") =>
+            PopupManager.Instance.Show<PopupNotice>().SetMessage(message);
 
         static void DrawSave(SaveService save)
         {
