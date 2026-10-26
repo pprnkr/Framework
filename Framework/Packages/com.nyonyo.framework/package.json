@@ -5,8 +5,7 @@
   "description": "Unity 2D 게임 개발을 위한 공용 프레임워크.",
   "unity": "6000.3",
   "author": {
-    "name": "pprnkr",
-    "url": "https://github.com/pprnkr"
+    "name": "Nyonyo"
   },
   "keywords": [
     "framework",

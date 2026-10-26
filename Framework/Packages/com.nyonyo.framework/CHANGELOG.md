@@ -6,3 +6,6 @@
 
 ### Added
 - 패키지 기본 구조와 어셈블리 정의(Runtime, Editor, Tests).
+- 부트스트랩: `Bootstrapper`, `FrameworkSettings`, `GameInstaller`.
+- 서비스 관리: `ServiceRegistry`, `Services`, `IInitializable`, `IAsyncInitializable`.
+- 에디터 메뉴: Tools > Nyonyo Framework > Create Settings.
