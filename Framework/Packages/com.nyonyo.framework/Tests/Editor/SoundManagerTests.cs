@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Nyonyo.Framework.Audio;
+using Nyonyo.Framework.Save;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -195,6 +196,34 @@ namespace Nyonyo.Framework.Editor.Tests
 
             CollectionAssert.Contains(_loader.Log, "release:SFX/Hit:Addressables");
             Assert.AreEqual(2, LoadCount("SFX/Hit"));
+        }
+
+        [Test]
+        public void Volumes_AreLoadedFromSaveOnCreate()
+        {
+            var save = new SaveService(new MemorySaveStorage());
+            save.Save(SoundManager.VolumeSaveKey, new SoundVolumeData { master = 0.2f, bgm = 0.3f, sfx = 0.4f }, SaveScope.Global);
+
+            var sound = new SoundManager(null, _parent.transform, _loader, save);
+
+            Assert.AreEqual(0.2f, sound.MasterVolume, 1e-5f);
+            Assert.AreEqual(0.3f, sound.BgmVolume, 1e-5f);
+            Assert.AreEqual(0.4f, sound.SfxVolume, 1e-5f);
+            sound.Dispose();
+        }
+
+        [Test]
+        public void Volumes_AreSavedOnDisposeAfterChange()
+        {
+            var save = new SaveService(new MemorySaveStorage());
+            var sound = new SoundManager(null, _parent.transform, _loader, save);
+
+            sound.SfxVolume = 0.25f;
+            sound.Dispose();
+
+            var saved = save.Load<SoundVolumeData>(SoundManager.VolumeSaveKey, scope: SaveScope.Global);
+            Assert.AreEqual(0.25f, saved.sfx, 1e-5f);
+            Assert.AreEqual(1f, saved.master, 1e-5f);
         }
 
         [Test]

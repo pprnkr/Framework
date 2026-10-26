@@ -3,7 +3,7 @@ using Nyonyo.Framework.UI;
 
 namespace Nyonyo.Framework.Editor.Tests
 {
-    [Popup(Path = "Popups/TestPopupB", LoadType = LoadType.Resources)]
+    [Popup(Path = "Popups/TestPopupB", LoadType = LoadType.Resources, Preload = true)]
     public class TestPopupB : PopupBase
     {
     }

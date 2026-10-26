@@ -19,15 +19,26 @@ namespace Nyonyo.Framework.Assets
     {
         readonly Dictionary<string, List<AsyncOperationHandle>> _handles = new();
 
+        /// <remarks>
+        /// WebGL은 Addressables 동기 로드(WaitForCompletion)를 지원하지 않아서 <see cref="NotSupportedException"/>을 던집니다.
+        /// 에디터의 빌드 대상이 WebGL이면 미리 경고합니다.
+        /// </remarks>
         public T Load<T>(string path, LoadType loadType) where T : Object
         {
             ValidatePath(path);
             if (loadType == LoadType.Resources)
                 return Validate(Resources.Load<T>(path), path, loadType);
 
+#if UNITY_WEBGL && !UNITY_EDITOR
+            throw new NotSupportedException(WebGLSyncLoadMessage(path));
+#else
+#if UNITY_WEBGL
+            Debug.LogWarning($"[Nyonyo Framework] {WebGLSyncLoadMessage(path)} (에디터에서는 동작하지만 WebGL 빌드에서는 실패합니다)");
+#endif
             var handle = StartAddressable<T>(path);
             handle.WaitForCompletion();
             return GetAddressableResult<T>(path, handle);
+#endif
         }
 
         public async Awaitable<T> LoadAsync<T>(string path, LoadType loadType, CancellationToken cancellationToken = default)
@@ -129,6 +140,10 @@ namespace Nyonyo.Framework.Assets
             throw new InvalidOperationException(
                 $"{loadType}에서 {typeof(T).Name} {path}을(를) 찾지 못했습니다. Resources 폴더 기준 경로(확장자 제외)인지 확인하세요.");
         }
+
+        static string WebGLSyncLoadMessage(string path) =>
+            $"WebGL에서는 Addressables 에셋 {path}을(를) 동기로 불러올 수 없습니다. " +
+            "LoadAsync를 쓰거나, 팝업이라면 [Popup(Preload = true)] 또는 PopupManager.PreloadAsync로 미리 불러 두세요.";
 
         static void ValidatePath(string path)
         {

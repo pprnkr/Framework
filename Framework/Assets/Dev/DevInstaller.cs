@@ -2,6 +2,7 @@ using Nyonyo.Framework;
 using Nyonyo.Framework.Assets;
 using Nyonyo.Framework.Audio;
 using Nyonyo.Framework.Events;
+using Nyonyo.Framework.Save;
 using Nyonyo.Framework.Scenes;
 using Nyonyo.Framework.UI;
 using UnityEngine;
@@ -25,10 +26,13 @@ namespace Nyonyo.Dev
             var assets = new AssetLoader();
             services.Register<IAssetLoader>(assets);
 
+            var save = new SaveService();
+            services.Register(save);
+
             services.Register<ISceneService>(
                 new SceneService(new FadeTransition(Bootstrapper.Root), events) { MinimumLoadingSeconds = 0.3f });
             services.Register(new PopupManager(_uiSettings, Bootstrapper.Root, events, assets));
-            services.Register(new SoundManager(_soundSettings, Bootstrapper.Root, assets));
+            services.Register(new SoundManager(_soundSettings, Bootstrapper.Root, assets, save));
 
             Bootstrapper.Root.gameObject.AddComponent<DevSceneSwitcher>();
         }

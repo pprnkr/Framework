@@ -23,7 +23,7 @@ namespace Nyonyo.Framework.UI
     /// 프리팹은 팝업 클래스의 <see cref="PopupAttribute"/>에 적힌 경로와 방식으로 처음 띄울 때 불러오고, 그 뒤로는 재사용합니다.
     /// Play 중에 씬에 EventSystem이 없으면 직접 만들어서 유지합니다. 그러니 씬에는 EventSystem을 두지 마세요.
     /// </remarks>
-    public sealed class PopupManager : IDisposable
+    public sealed class PopupManager : IAsyncInitializable, IDisposable
     {
         /// <summary>가장 아래 층(<see cref="UILayer.Screen"/>) Canvas의 정렬 순서입니다.</summary>
         public const int BaseSortingOrder = 1000;
@@ -87,6 +87,95 @@ namespace Nyonyo.Framework.UI
         public event Action BackKeyUnhandled;
 
         /// <summary>
+        /// 부트스트랩 초기화 단계에서 <c>[Popup(Preload = true)]</c> 팝업 프리팹을 미리 불러 둡니다.
+        /// 하나가 실패해도 에러를 남기고 나머지는 계속 불러옵니다.
+        /// </summary>
+        public Awaitable InitializeAsync(CancellationToken cancellationToken) =>
+            PreloadTypesAsync(FindPreloadPopupTypes(), cancellationToken);
+
+        internal async Awaitable PreloadTypesAsync(IEnumerable<Type> types, CancellationToken cancellationToken)
+        {
+            foreach (var type in types)
+            {
+                try
+                {
+                    await LoadPrefabAsync(type, cancellationToken);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 로드된 게임 어셈블리에서 <c>[Popup(Preload = true)]</c>가 붙은 팝업 타입을 찾습니다.
+        /// Unity와 .NET 어셈블리, 그리고 에디터에서 함께 로드되는 테스트 어셈블리는 건너뜁니다.
+        /// </summary>
+        internal static List<Type> FindPreloadPopupTypes()
+        {
+            var assemblies = new List<Assembly>();
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                if (!IsEngineAssembly(assembly.GetName().Name) && !IsTestAssembly(assembly))
+                    assemblies.Add(assembly);
+            }
+
+            return FindPreloadPopupTypes(assemblies);
+        }
+
+        internal static List<Type> FindPreloadPopupTypes(IEnumerable<Assembly> assemblies)
+        {
+            var result = new List<Type>();
+            foreach (var assembly in assemblies)
+            {
+                Type[] types;
+                try
+                {
+                    types = assembly.GetTypes();
+                }
+                catch (ReflectionTypeLoadException e)
+                {
+                    types = e.Types;
+                }
+
+                foreach (var type in types)
+                {
+                    if (type == null || type.IsAbstract || !typeof(PopupBase).IsAssignableFrom(type))
+                        continue;
+
+                    var info = type.GetCustomAttribute<PopupAttribute>();
+                    if (info != null && info.Preload)
+                        result.Add(type);
+                }
+            }
+
+            return result;
+        }
+
+        static bool IsEngineAssembly(string name) =>
+            name == "mscorlib" || name == "netstandard" ||
+            name.StartsWith("System", StringComparison.Ordinal) ||
+            name.StartsWith("Unity", StringComparison.Ordinal) ||
+            name.StartsWith("Mono.", StringComparison.Ordinal) ||
+            name.StartsWith("nunit", StringComparison.OrdinalIgnoreCase);
+
+        static bool IsTestAssembly(Assembly assembly)
+        {
+            foreach (var reference in assembly.GetReferencedAssemblies())
+            {
+                if (reference.Name == "nunit.framework")
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
         /// 이미 불러온 팝업 프리팹을 직접 등록합니다. 등록된 프리팹은 <see cref="PopupAttribute"/>보다 우선합니다.
         /// 같은 타입이 이미 등록되어 있으면 경고를 띄우고 무시합니다.
         /// </summary>
@@ -108,7 +197,8 @@ namespace Nyonyo.Framework.UI
         /// </summary>
         /// <remarks>
         /// 프리팹을 아직 불러오지 않았다면 그 자리에서 불러옵니다(Addressables는 WaitForCompletion).
-        /// WebGL이거나 프리팹이 커서 멈춤이 신경 쓰이면 <see cref="ShowAsync{T}"/>나 <see cref="PreloadAsync{T}"/>를 쓰세요.
+        /// WebGL은 동기 로드를 지원하지 않으므로, WebGL에서 Addressables 팝업을 Show로 띄우려면
+        /// <c>[Popup(Preload = true)]</c>로 미리 불러 두거나 <see cref="ShowAsync{T}"/>를 쓰세요.
         /// </remarks>
         /// <param name="layer">팝업을 띄울 층입니다. null이면 프리팹에 설정된 층을 씁니다.</param>
         /// <returns>생성된 팝업입니다. 내용을 채우거나 닫힐 때까지 기다릴 때 씁니다.</returns>

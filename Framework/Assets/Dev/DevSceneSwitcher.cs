@@ -2,6 +2,7 @@ using System.IO;
 using Nyonyo.Framework;
 using Nyonyo.Framework.Audio;
 using Nyonyo.Framework.Events;
+using Nyonyo.Framework.Save;
 using Nyonyo.Framework.Scenes;
 using Nyonyo.Framework.UI;
 using UnityEngine;
@@ -22,19 +23,57 @@ namespace Nyonyo.Dev
             PopupManager.Instance.BackKeyUnhandled += () => Debug.Log("[Dev] Back key: no popup to close");
         }
 
+        [System.Serializable]
+        class DevSaveData
+        {
+            public int clicks;
+        }
+
         void OnGUI()
         {
             if (!Services.TryGet(out ISceneService scenes) || !Services.TryGet(out PopupManager popups) ||
-                !Services.TryGet(out SoundManager sound))
+                !Services.TryGet(out SoundManager sound) || !Services.TryGet(out SaveService save))
                 return;
 
-            GUILayout.BeginArea(new Rect(10, 10, 260, 1000));
+            GUILayout.BeginArea(new Rect(10, 10, 260, 1200));
+            if (!Bootstrapper.IsReady)
+            {
+                // 팝업 미리 불러오기 같은 비동기 초기화가 끝나기 전입니다.
+                GUILayout.Label("Initializing...");
+                GUILayout.EndArea();
+                return;
+            }
+
             DrawScenes(scenes);
             GUILayout.Space(10);
             DrawPopups(popups);
             GUILayout.Space(10);
             DrawSound(sound);
+            GUILayout.Space(10);
+            DrawSave(save);
             GUILayout.EndArea();
+        }
+
+        static void DrawSave(SaveService save)
+        {
+            var data = save.Load("dev", new DevSaveData());
+            GUILayout.Label($"Save slot {save.CurrentSlot}: clicks {data.clicks}");
+            if (GUILayout.Button("Clicks +1 (save)"))
+            {
+                data.clicks++;
+                save.Save("dev", data);
+            }
+
+            GUILayout.BeginHorizontal();
+            for (var slot = 0; slot < 3; slot++)
+            {
+                if (GUILayout.Button($"Slot {slot}"))
+                    save.CurrentSlot = slot;
+            }
+
+            GUILayout.EndHorizontal();
+            if (GUILayout.Button("Delete current slot"))
+                save.DeleteSlot(save.CurrentSlot);
         }
 
         static void DrawScenes(ISceneService scenes)

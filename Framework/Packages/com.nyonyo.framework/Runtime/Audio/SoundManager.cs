@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using Nyonyo.Framework.Assets;
+using Nyonyo.Framework.Save;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -15,9 +16,16 @@ namespace Nyonyo.Framework.Audio
     /// BGM은 MasterVolume × BgmVolume × 재생할 때 넘긴 volume이고, 효과음은 MasterVolume × SfxVolume × 재생할 때 넘긴 volume입니다.
     /// 효과음은 기본 8개까지 동시에 들리고, 다 차면 가장 오래된 효과음을 끊고 재생합니다.
     /// 효과음은 한 번 불러오면 <see cref="UnloadSFX"/>를 부를 때까지 메모리에 남고, BGM은 다른 BGM으로 바뀌거나 멈출 때 내려갑니다.
+    /// <see cref="SaveService"/>를 넘기면 볼륨을 전역 데이터로 저장하고, 다음 실행 때 불러옵니다.
     /// </remarks>
     public sealed class SoundManager : IDisposable
     {
+        /// <summary>볼륨을 저장하는 전역 저장 키입니다.</summary>
+        public const string VolumeSaveKey = "sound.volume";
+
+        // 슬라이더를 움직이는 동안 매번 저장하지 않도록, 마지막 변경 뒤 이 시간(실시간 초)이 지나면 저장합니다.
+        const double VolumeSaveDelay = 0.5;
+
         sealed class BgmChannel
         {
             public AudioSource Source;
@@ -46,8 +54,11 @@ namespace Nyonyo.Framework.Audio
         readonly SfxChannel[] _sfx;
         readonly Dictionary<string, AudioClip> _sfxClips = new();
         readonly CancellationTokenSource _disposeCts = new();
+        readonly SaveService _save;
         CancellationTokenSource _bgmCts;
         int _activeBgm;
+        int _volumeSaveRequest;
+        bool _volumeDirty;
         float _masterVolume = 1f;
         float _bgmVolume = 1f;
         float _sfxVolume = 1f;
@@ -60,8 +71,10 @@ namespace Nyonyo.Framework.Audio
         /// <param name="settings">경로 규칙과 채널 수입니다. null이면 기본값(Addressables, BGM/{0}, SFX/{0}, 8채널)을 씁니다.</param>
         /// <param name="parent">AudioSource를 붙일 부모입니다. 보통 <see cref="Bootstrapper.Root"/>를 넘깁니다. null이면 DontDestroyOnLoad 오브젝트로 만듭니다.</param>
         /// <param name="loader">사운드를 불러올 로더입니다. 서비스로 등록한 <see cref="AssetLoader"/>를 넘기세요. null이면 직접 하나 만들어 씁니다.</param>
-        public SoundManager(SoundSettings settings, Transform parent, IAssetLoader loader = null)
+        /// <param name="save">넘기면 저장된 볼륨을 불러오고, 볼륨이 바뀌면 자동으로 저장합니다.</param>
+        public SoundManager(SoundSettings settings, Transform parent, IAssetLoader loader = null, SaveService save = null)
         {
+            _save = save;
             _ownsLoader = loader == null;
             _loader = loader ?? new AssetLoader();
             _loadType = settings != null ? settings.LoadType : LoadType.Addressables;
@@ -81,6 +94,8 @@ namespace Nyonyo.Framework.Audio
             _sfx = new SfxChannel[sfxChannels];
             for (var i = 0; i < _sfx.Length; i++)
                 _sfx[i] = new SfxChannel { Source = CreateSource($"SFX {i}") };
+
+            LoadVolumes();
         }
 
         /// <summary>
@@ -318,10 +333,26 @@ namespace Nyonyo.Framework.Audio
         }
 
         /// <summary>
-        /// 모든 사운드를 멈추고, 불러온 사운드를 로더에 반환합니다.
+        /// 지금 볼륨을 바로 저장합니다. 볼륨은 바뀌면 자동으로 저장되므로 보통은 부를 필요가 없습니다.
+        /// </summary>
+        public void SaveVolumes()
+        {
+            if (_save == null)
+                return;
+
+            _volumeDirty = false;
+            var data = new SoundVolumeData { master = _masterVolume, bgm = _bgmVolume, sfx = _sfxVolume };
+            _save.Save(VolumeSaveKey, data, SaveScope.Global);
+        }
+
+        /// <summary>
+        /// 저장하지 않은 볼륨 변경을 저장한 뒤, 모든 사운드를 멈추고 불러온 사운드를 로더에 반환합니다.
         /// </summary>
         public void Dispose()
         {
+            if (_volumeDirty)
+                SaveVolumes();
+
             _disposeCts.Cancel();
             _bgmCts?.Cancel();
             foreach (var channel in _bgm)
@@ -446,6 +477,45 @@ namespace Nyonyo.Framework.Audio
             field = value;
             ApplyVolumes();
             VolumeChanged?.Invoke();
+            ScheduleVolumeSave();
+        }
+
+        void LoadVolumes()
+        {
+            if (_save == null || !_save.TryLoad(VolumeSaveKey, out SoundVolumeData data, SaveScope.Global))
+                return;
+
+            _masterVolume = Mathf.Clamp01(data.master);
+            _bgmVolume = Mathf.Clamp01(data.bgm);
+            _sfxVolume = Mathf.Clamp01(data.sfx);
+            ApplyVolumes();
+        }
+
+        void ScheduleVolumeSave()
+        {
+            if (_save == null)
+                return;
+
+            _volumeDirty = true;
+            _ = SaveVolumesLaterAsync(++_volumeSaveRequest);
+        }
+
+        // 일시정지(timeScale 0) 중에도 저장되도록 실시간으로 기다립니다.
+        async Awaitable SaveVolumesLaterAsync(int request)
+        {
+            var due = Time.realtimeSinceStartupAsDouble + VolumeSaveDelay;
+            try
+            {
+                while (Time.realtimeSinceStartupAsDouble < due)
+                    await Awaitable.NextFrameAsync(_disposeCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (request == _volumeSaveRequest && _volumeDirty)
+                SaveVolumes();
         }
 
         void ApplyVolumes()

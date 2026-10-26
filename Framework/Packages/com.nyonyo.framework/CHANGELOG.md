@@ -23,6 +23,11 @@
 - 에디터: `AddressableEditorUtility.SetAddress`, Tools > Nyonyo Framework > Sound > Register Sounds to Addressables.
   Create UI Script > Popup이 `[Popup]`을 넣고 프리팹을 Addressables에 등록합니다. 팝업 인스펙터에서 `[Popup]` 누락이나 경로 불일치를 경고합니다.
 
+- 저장: `SaveService`(슬롯, 전역 데이터, 슬롯 정보, `IVersionedSaveData` 버전 변환), `FileSaveStorage`, `PlayerPrefsSaveStorage`(WebGL 기본), `JsonSaveSerializer`.
+- `SoundManager`가 `SaveService`를 받으면 볼륨을 자동으로 저장하고 불러옵니다.
+- WebGL: `[Popup(Preload = true)]`로 게임 시작 때 팝업을 미리 불러옵니다(`PopupManager`가 `IAsyncInitializable`).
+  WebGL 빌드에서 Addressables 동기 로드는 명확한 `NotSupportedException`을 던지고, 에디터의 빌드 대상이 WebGL이면 미리 경고합니다.
+
 ### Changed
 - `UISettings`의 Popup Prefabs 목록을 제거했습니다. 팝업 프리팹은 `[Popup]` 어트리뷰트로 불러옵니다.
 - `PopupManager` 생성자에 `IAssetLoader` 인자를 추가했습니다.

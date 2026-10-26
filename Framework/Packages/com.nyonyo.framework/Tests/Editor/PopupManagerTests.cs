@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using Nyonyo.Framework.Events;
 using Nyonyo.Framework.Scenes;
 using Nyonyo.Framework.UI;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TestTools;
 using Object = UnityEngine.Object;
 
 namespace Nyonyo.Framework.Editor.Tests
@@ -301,6 +303,52 @@ namespace Nyonyo.Framework.Editor.Tests
 
             Assert.Throws<InvalidOperationException>(() => manager.Show<TestPopupB>());
             CollectionAssert.Contains(loader.Log, "release:Popups/TestPopupB:Resources");
+            manager.Dispose();
+        }
+
+        [Test]
+        public void FindPreloadPopupTypes_FindsOnlyPreloadPopups()
+        {
+            var types = PopupManager.FindPreloadPopupTypes(new[] { typeof(TestPopupB).Assembly });
+
+            CollectionAssert.Contains(types, typeof(TestPopupB));
+            CollectionAssert.DoesNotContain(types, typeof(TestPopupA));
+        }
+
+        [Test]
+        public void FindPreloadPopupTypes_SkipsTestAssemblies()
+        {
+            CollectionAssert.DoesNotContain(PopupManager.FindPreloadPopupTypes(), typeof(TestPopupB));
+        }
+
+        [Test]
+        public void PreloadTypes_LoadsPrefab_SoShowDoesNotLoadAgain()
+        {
+            var loader = new FakeAssetLoader();
+            loader.Assets["Popups/TestPopupB"] = _prefabB.gameObject;
+            var manager = new PopupManager(null, _parent.transform, null, loader);
+
+            var awaiter = manager.PreloadTypesAsync(new[] { typeof(TestPopupB) }, default).GetAwaiter();
+            Assert.IsTrue(awaiter.IsCompleted);
+            awaiter.GetResult();
+            manager.Show<TestPopupB>();
+
+            CollectionAssert.AreEqual(new[] { "load:Popups/TestPopupB:Resources" }, loader.Log);
+            manager.Dispose();
+        }
+
+        [Test]
+        public void PreloadTypes_FailureIsLoggedAndOthersContinue()
+        {
+            var loader = new FakeAssetLoader();
+            loader.Assets["Popups/TestPopupB"] = _prefabB.gameObject;
+            var manager = new PopupManager(null, _parent.transform, null, loader);
+
+            LogAssert.Expect(LogType.Exception, new Regex("TestPopupA"));
+            var awaiter = manager.PreloadTypesAsync(new[] { typeof(TestPopupA), typeof(TestPopupB) }, default).GetAwaiter();
+            awaiter.GetResult();
+
+            CollectionAssert.Contains(loader.Log, "load:Popups/TestPopupB:Resources");
             manager.Dispose();
         }
 
