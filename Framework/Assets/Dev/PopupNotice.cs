@@ -1,4 +1,5 @@
 using System;
+using Nyonyo.Framework.Assets;
 using Nyonyo.Framework.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,6 +9,7 @@ namespace Nyonyo.Dev
     /// <summary>
     /// 화면 위쪽에 잠깐 떴다가 사라지는 띠알람 샘플입니다. Notice 층에 떠서 팝업보다 항상 위에 보입니다.
     /// </summary>
+    [Popup(Path = "Assets/Dev/Prefabs/PopupNotice.prefab", LoadType = LoadType.Addressables)]
     public class PopupNotice : PopupBase
     {
         [SerializeField] Text _message;

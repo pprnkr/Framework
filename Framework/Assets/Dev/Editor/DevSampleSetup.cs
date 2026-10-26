@@ -1,6 +1,10 @@
 using System.IO;
 using System.Linq;
+using System.Text;
 using Nyonyo.Framework;
+using Nyonyo.Framework.Audio;
+using Nyonyo.Framework.Editor.Assets;
+using Nyonyo.Framework.Editor.Audio;
 using Nyonyo.Framework.Editor.UI;
 using Nyonyo.Framework.UI;
 using UnityEditor;
@@ -10,13 +14,16 @@ using UnityEngine.UI;
 namespace Nyonyo.Dev.Editor
 {
     /// <summary>
-    /// 개발용 샘플(팝업 프리팹, UISettings, DevInstaller, 테스트 씬)을 한 번에 준비합니다. 여러 번 실행해도 됩니다.
+    /// 개발용 샘플(팝업 프리팹, 테스트 사운드, 설정 에셋, DevInstaller, 테스트 씬)을 한 번에 준비하고 Addressables에 등록합니다.
+    /// 여러 번 실행해도 됩니다.
     /// </summary>
     static class DevSampleSetup
     {
         const string DevFolder = "Assets/Dev";
         const string PrefabFolder = DevFolder + "/Prefabs";
+        const string SoundFolder = DevFolder + "/Sounds";
         const string UISettingsPath = DevFolder + "/DevUISettings.asset";
+        const string SoundSettingsPath = DevFolder + "/DevSoundSettings.asset";
         const string InstallerPath = DevFolder + "/DevInstaller.asset";
         const string FrameworkSettingsPath = "Assets/Resources/NyonyoFrameworkSettings.asset";
         const string SceneA = "Assets/Scenes/SampleScene.unity";
@@ -25,18 +32,92 @@ namespace Nyonyo.Dev.Editor
         [MenuItem("Tools/Nyonyo Framework/Dev/Setup Samples")]
         static void Setup()
         {
-            if (!AssetDatabase.IsValidFolder(PrefabFolder))
-                AssetDatabase.CreateFolder(DevFolder, "Prefabs");
+            CreateFolder(DevFolder, "Prefabs");
+            CreateFolder(DevFolder, "Sounds");
+            CreateFolder(SoundFolder, "BGM");
+            CreateFolder(SoundFolder, "SFX");
 
-            var popupTest = CreatePopupTestPrefab();
-            var popupNotice = CreatePopupNoticePrefab();
-            var uiSettings = CreateUISettings(popupTest, popupNotice);
-            var installer = CreateInstaller(uiSettings);
+            // 팝업 프리팹은 [Popup(Path = 에셋 경로)]로 불러오므로 에셋 경로를 address로 등록합니다.
+            var popupTestPath = AssetDatabase.GetAssetPath(CreatePopupTestPrefab());
+            var popupNoticePath = AssetDatabase.GetAssetPath(CreatePopupNoticePrefab());
+            AddressableEditorUtility.SetAddress(popupTestPath, popupTestPath);
+            AddressableEditorUtility.SetAddress(popupNoticePath, popupNoticePath);
+
+            CreateSounds();
+            var soundSettings = CreateSoundSettings();
+            SoundAddressRegistrar.Register(soundSettings);
+
+            var installer = CreateInstaller(CreateUISettings(), soundSettings);
             AddInstallerToFrameworkSettings(installer);
             SetupScenes();
 
             AssetDatabase.SaveAssets();
             Debug.Log("[Dev] 샘플 준비 완료. Play를 누르고 왼쪽 위 버튼으로 확인하세요.");
+        }
+
+        static void CreateFolder(string parent, string name)
+        {
+            if (!AssetDatabase.IsValidFolder($"{parent}/{name}"))
+                AssetDatabase.CreateFolder(parent, name);
+        }
+
+        // 테스트용 사운드를 사인파 WAV로 만듭니다. 이미 있으면 건너뜁니다.
+        static void CreateSounds()
+        {
+            WriteTone($"{SoundFolder}/BGM/DevBgmA.wav", 4f, 261.63f, 329.63f, 392f);
+            WriteTone($"{SoundFolder}/BGM/DevBgmB.wav", 4f, 220f, 261.63f, 329.63f);
+            WriteTone($"{SoundFolder}/SFX/Beep.wav", 0.3f, 880f);
+            WriteTone($"{SoundFolder}/SFX/Click.wav", 0.08f, 1320f);
+        }
+
+        static void WriteTone(string assetPath, float seconds, params float[] frequencies)
+        {
+            if (File.Exists(assetPath))
+                return;
+
+            const int sampleRate = 44100;
+            var sampleCount = (int)(sampleRate * seconds);
+            using (var writer = new BinaryWriter(File.Create(assetPath)))
+            {
+                writer.Write(Encoding.ASCII.GetBytes("RIFF"));
+                writer.Write(36 + sampleCount * 2);
+                writer.Write(Encoding.ASCII.GetBytes("WAVEfmt "));
+                writer.Write(16);
+                writer.Write((short)1);
+                writer.Write((short)1);
+                writer.Write(sampleRate);
+                writer.Write(sampleRate * 2);
+                writer.Write((short)2);
+                writer.Write((short)16);
+                writer.Write(Encoding.ASCII.GetBytes("data"));
+                writer.Write(sampleCount * 2);
+
+                for (var i = 0; i < sampleCount; i++)
+                {
+                    var time = (float)i / sampleRate;
+                    var envelope = Mathf.Clamp01(Mathf.Min(time, seconds - time) * 20f);
+                    var value = frequencies.Sum(frequency => Mathf.Sin(2f * Mathf.PI * frequency * time)) / frequencies.Length;
+                    writer.Write((short)(value * envelope * 0.3f * short.MaxValue));
+                }
+            }
+
+            AssetDatabase.ImportAsset(assetPath);
+        }
+
+        static SoundSettings CreateSoundSettings()
+        {
+            var settings = AssetDatabase.LoadAssetAtPath<SoundSettings>(SoundSettingsPath);
+            if (settings == null)
+            {
+                settings = ScriptableObject.CreateInstance<SoundSettings>();
+                AssetDatabase.CreateAsset(settings, SoundSettingsPath);
+            }
+
+            var serialized = new SerializedObject(settings);
+            serialized.FindProperty("_bgmFolder").stringValue = $"{SoundFolder}/BGM";
+            serialized.FindProperty("_sfxFolder").stringValue = $"{SoundFolder}/SFX";
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            return settings;
         }
 
         static PopupTest CreatePopupTestPrefab()
@@ -99,7 +180,7 @@ namespace Nyonyo.Dev.Editor
             return SavePrefab<PopupNotice>(root.gameObject, $"{PrefabFolder}/PopupNotice.prefab");
         }
 
-        static UISettings CreateUISettings(params PopupBase[] prefabs)
+        static UISettings CreateUISettings()
         {
             var settings = AssetDatabase.LoadAssetAtPath<UISettings>(UISettingsPath);
             if (settings == null)
@@ -108,16 +189,10 @@ namespace Nyonyo.Dev.Editor
                 AssetDatabase.CreateAsset(settings, UISettingsPath);
             }
 
-            var serialized = new SerializedObject(settings);
-            var list = serialized.FindProperty("_popupPrefabs");
-            list.arraySize = prefabs.Length;
-            for (var i = 0; i < prefabs.Length; i++)
-                list.GetArrayElementAtIndex(i).objectReferenceValue = prefabs[i];
-            serialized.ApplyModifiedPropertiesWithoutUndo();
             return settings;
         }
 
-        static DevInstaller CreateInstaller(UISettings uiSettings)
+        static DevInstaller CreateInstaller(UISettings uiSettings, SoundSettings soundSettings)
         {
             // 이미 만들어 둔 DevInstaller가 있으면 그걸 씁니다.
             var guid = AssetDatabase.FindAssets("t:DevInstaller").FirstOrDefault();
@@ -131,6 +206,7 @@ namespace Nyonyo.Dev.Editor
             }
 
             SetReference(installer, "_uiSettings", uiSettings);
+            SetReference(installer, "_soundSettings", soundSettings);
             return installer;
         }
 

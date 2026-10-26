@@ -1,4 +1,6 @@
 using Nyonyo.Framework;
+using Nyonyo.Framework.Assets;
+using Nyonyo.Framework.Audio;
 using Nyonyo.Framework.Events;
 using Nyonyo.Framework.Scenes;
 using Nyonyo.Framework.UI;
@@ -13,14 +15,20 @@ namespace Nyonyo.Dev
     public class DevInstaller : GameInstaller
     {
         [SerializeField] UISettings _uiSettings;
+        [SerializeField] SoundSettings _soundSettings;
 
         public override void Install(ServiceRegistry services)
         {
             var events = new EventBus();
             services.Register<IEventBus>(events);
+
+            var assets = new AssetLoader();
+            services.Register<IAssetLoader>(assets);
+
             services.Register<ISceneService>(
                 new SceneService(new FadeTransition(Bootstrapper.Root), events) { MinimumLoadingSeconds = 0.3f });
-            services.Register(new PopupManager(_uiSettings, Bootstrapper.Root, events));
+            services.Register(new PopupManager(_uiSettings, Bootstrapper.Root, events, assets));
+            services.Register(new SoundManager(_soundSettings, Bootstrapper.Root, assets));
 
             Bootstrapper.Root.gameObject.AddComponent<DevSceneSwitcher>();
         }

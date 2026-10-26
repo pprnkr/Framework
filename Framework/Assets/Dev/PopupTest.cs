@@ -1,3 +1,5 @@
+using Nyonyo.Framework.Assets;
+using Nyonyo.Framework.Audio;
 using Nyonyo.Framework.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -7,6 +9,7 @@ namespace Nyonyo.Dev
     /// <summary>
     /// 팝업 동작 확인용 샘플입니다. 같은 층에 여러 개를 띄우면 나중 것이 위에 겹쳐 보이도록 조금씩 비켜서 놓습니다.
     /// </summary>
+    [Popup(Path = "Assets/Dev/Prefabs/PopupTest.prefab", LoadType = LoadType.Addressables)]
     public class PopupTest : PopupBase
     {
         #region Auto Generated UI
@@ -27,6 +30,8 @@ namespace Nyonyo.Dev
 
         public override void OnButtonEvent(Button button)
         {
+            _ = SoundManager.Instance.PlaySFX("Click");
+
             switch (button.name)
             {
                 case "BTN_Stack":

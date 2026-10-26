@@ -73,8 +73,9 @@ Packages/com.nyonyo.framework/
 | 3 | 씬 관리 (비동기 로드, 페이드) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
 | 4 | UI 관리 (5단계 레이어, PopupManager, 뒤로가기, UIBase) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
 | 4-1 | UI 자동 매퍼 (접두사 SO, Create UI Script 메뉴, Generate/Assign) | 완료 (외부 컴파일과 생성기 실행만 확인, Unity 검증 안 됨) |
-| 5 | 오디오 (BGM 크로스페이드, SFX 풀링, Mixer 볼륨) | **다음 작업** |
-| 6 | 저장/로드 (JSON, 슬롯, 버전 마이그레이션) | 예정 |
+| 4-2 | 에셋 로딩 (Resources/Addressables, `[Popup]` 어트리뷰트) | 완료 (스텁 컴파일만 확인, Unity 검증 안 됨) |
+| 5 | 사운드 (BGM 크로스페이드, 효과음 8채널, 볼륨 곱) | 완료 (스텁 컴파일만 확인, Unity 검증 안 됨) |
+| 6 | 저장/로드 (JSON, 슬롯, 버전 마이그레이션, 볼륨 저장 연동) | **다음 작업** |
 | 7 | 풀링, FSM, 타이머 | 예정 |
 | 8 | 디버그 도구 (로거, 치트 콘솔, 에디터 툴) | 예정 |
 
@@ -180,7 +181,8 @@ Packages/com.nyonyo.framework/
 | `PopupManager` | `Show<T>(UILayer? layer)`, `Find<T>`, `IsOpen<T>`, `CloseAll(layer?)`, `HandleBack()`, `GetLayerRoot`, `GetOpenPopups`, `RegisterPrefab`, `BackKeyUnhandled` 이벤트를 제공합니다. `static Instance => Services.Get<PopupManager>()`(싱글톤 아님). |
 | `UIBase` | 모든 UI의 기본(DisallowMultipleComponent). `Show`/`Hide`(활성화 + `OnShow`/`OnHide` 훅), `IsVisible`, `public virtual OnButtonEvent(Button)`(기본은 아무것도 안 함) |
 | `PopupBase : UIBase` | 층, 뒤로가기, 닫기 담당. virtual `OnOpen`, `Close()`(Destroy, Edit 모드에서는 DestroyImmediate). `Closed` 이벤트, `WaitUntilClosedAsync`. 직렬화 필드는 `_layer`, `_backKey`, `_closeOnSceneChange`입니다. |
-| `UISettings` (SO) | 기준 해상도(1920x1080), match 0.5, 팝업 프리팹 목록, 뒤로가기 처리 여부 |
+| `UISettings` (SO) | 기준 해상도(1920x1080), match 0.5, 뒤로가기 처리 여부. 팝업 프리팹 목록은 2026-10-27 사용자 요청으로 제거했고, `[Popup]` 어트리뷰트로 대체했습니다. |
+| `PopupAttribute` | `[Popup(Path = "...", LoadType = LoadType.Addressables)]`. PopupManager가 처음 Show할 때 이 값으로 GameObject를 불러와 캐시하고, Dispose 때 Release합니다. `RegisterPrefab`으로 직접 등록한 프리팹이 우선합니다. `Show`는 동기(Addressables WaitForCompletion, WebGL 불가)이고, `ShowAsync`와 `PreloadAsync`도 있습니다. |
 | `BackKeyBehavior` | `Close`, `Block`(아래 팝업도 막음), `Ignore`(건너뜀, 띠알람용) |
 | `PopupBackKeyHandler` (internal) | Update에서 ESC를 확인합니다. Input System에서는 안드로이드 뒤로가기도 ESC로 들어옵니다. |
 
@@ -228,14 +230,65 @@ Packages/com.nyonyo.framework/
 - **개발용 샘플:** Dev 샘플 `PopupTest`는 자동 생성 영역(RT_Panel, BTN_*)을 씁니다. `DevSampleSetup`이 `UIAutoMapper.Assign`으로 필드와 버튼을 연결합니다. 샘플 텍스트는 legacy Text라서 TXT_를 붙이지 않았습니다.
 - **생성기 결과 확인:** scratchpad의 `harness/`(.NET 10 콘솔)로 컴파일된 Editor DLL의 `UIScriptGenerator`를 리플렉션으로 실행해서 생성 결과를 확인했습니다.
 
+## 구현 완료: 에셋 로딩 (`Runtime/Assets/`, 네임스페이스 `Nyonyo.Framework.Assets`)
+
+사용자 방침(2026-10-27): 게임 구동에 꼭 필요한 최소한의 에셋만 Resources.Load를 쓰고, 나머지는 전부 Addressables를 씁니다.
+
+| 타입 | 역할 |
+|---|---|
+| `LoadType` | `Resources`(Resources 기준 경로, 확장자 제외), `Addressables`(address, 기본값은 에셋 경로) |
+| `IAssetLoader` | `Load<T>`(동기), `LoadAsync<T>`, `Release(path, type)` |
+| `AssetLoader` | Addressables 핸들을 경로별 List로 보관합니다(불러올 때마다 핸들 추가, Release마다 하나 반환, Addressables가 참조 횟수를 셉니다). 실패나 취소 시 핸들을 바로 반환하고, Dispose는 남은 핸들을 모두 반환합니다. Resources의 Release는 아무 일도 하지 않습니다. 대기는 `Awaitable.NextFrameAsync` 폴링으로 합니다(Task 미사용). |
+
+- **패키지 의존성:** `com.unity.addressables` **4.1.1**(2026-10-27 레지스트리 최신, unity 6000.0 이상)을 package.json dependencies에 추가했습니다. Runtime asmdef는 `Unity.Addressables`와 `Unity.ResourceManager`를, Editor asmdef는 `Unity.Addressables.Editor`를 참조합니다. 4.1.1 소스에서 API가 1.x/2.x와 같은 것을 확인했습니다.
+- **에디터 유틸리티:** `Editor/Assets/AddressableEditorUtility.SetAddress(assetPath, address)`는 `GetSettings(true)`로 설정이 없으면 만들고, FindAssetEntry가 없으면 `CreateOrMoveEntry(DefaultGroup)`를 호출한 뒤 `SetAddress`합니다.
+- **Create UI Script > Popup:** `UIScriptGenerator.GetPopupLoadInfo(prefabPath)`가 경로 안에 `/Resources/`가 있으면 Resources와 상대 경로를, 없으면 Addressables와 에셋 경로를 돌려줍니다. 이 값으로 `[Popup]`을 생성하고, Addressables면 프리팹을 자동으로 등록합니다.
+- **팝업 인스펙터:** `UIBaseEditor`가 팝업에서 `[Popup]`이 없거나 프리팹 위치와 다르면 경고합니다.
+
+## 구현 완료: 사운드 (`Runtime/Audio/`, 네임스페이스 `Nyonyo.Framework.Audio`)
+
+사용자 요구사항(2026-10-27):
+- BGM과 효과음을 구분하고, 효과음은 동시에 8개까지 재생합니다.
+- 볼륨은 Master, BGM, SFX와 재생별 볼륨을 두고, 0~1 값의 곱으로 계산합니다.
+- `SoundManager.Instance.PlayBGM`과 `PlaySFX`는 문자열 이름을 받아, 예약된 경로에서 찾아 불러온 뒤 재생합니다.
+
+| 타입 | 역할 |
+|---|---|
+| `SoundSettings` (SO) | LoadType(기본 Addressables), BGM과 SFX 경로 형식(`BGM/{0}`, `SFX/{0}`), Addressables 등록용 폴더(`Assets/Sounds/BGM`, `SFX`), SFX 채널 수(8) |
+| `SoundManager` | `static Instance => Services.Get<SoundManager>()`. BGM AudioSource 2개(크로스페이드), SFX AudioSource N개. `PlayBGM(name, volume, fadeSeconds, loop)`, `StopBGM(fade)`, `PlaySFX(name, volume)`, `PreloadSFX`, `StopAllSFX`, `UnloadSFX`, `UnloadAllSFX`, `MasterVolume`/`BgmVolume`/`SfxVolume`(clamp, 바뀌면 `VolumeChanged`), `CurrentBgm` |
+
+설계 결정은 다음과 같습니다.
+
+**효과음**
+- **채널 선택:** 채널이 사용 중인지는 `EndTime`(시작 시각 + clip.length/pitch, realtimeSinceStartupAsDouble)으로 판단합니다. `isPlaying`은 Edit 모드에서 쓸 수 없기 때문입니다. 빈 채널이 없으면 StartTime이 가장 이른 채널을 씁니다.
+- **효과음 캐시:** 효과음은 이름별로 캐시합니다. 동시에 처음 불러오면 먼저 끝난 것만 남기고 나머지는 Release합니다.
+
+**BGM**
+- **크로스페이드:** BGM은 바꾸거나 멈출 때 Release합니다. 크로스페이드는 unscaled time으로 진행합니다.
+- **새 요청과 취소:** 새 요청은 `_bgmCts`를 Cancel해서 이전 로드나 페이드를 멈춥니다(Dispose하지 않음). 같은 이름을 다시 요청하면 페이드를 취소하고 Fade=1로 돌린 뒤 볼륨만 바꿉니다.
+
+**오류와 미구현**
+- **사운드를 찾지 못할 때:** 예외를 던지지 않고 LogError만 남깁니다.
+- **볼륨 저장:** 볼륨 저장은 아직 없고, 저장 시스템에서 연동합니다. AudioMixer는 쓰지 않습니다.
+
+**에디터 메뉴:** `Editor/Audio/SoundAddressRegistrar` = Tools > Nyonyo Framework > Sound > Register Sounds to Addressables. 폴더의 AudioClip을 `string.Format(형식, 파일명)` address로 등록합니다. public `Register(SoundSettings)`를 제공합니다.
+
+**개발용 샘플:** `DevSampleSetup`이 사인파 WAV(DevBgmA, DevBgmB, Beep, Click)를 `Assets/Dev/Sounds`에 만들고, DevSoundSettings를 만들어 등록합니다. 팝업 프리팹도 Addressables에 등록합니다. `DevSceneSwitcher`에 BGM, SFX 버튼과 볼륨 슬라이더를 추가했습니다. DevInstaller는 AssetLoader를 서비스로 등록해서 PopupManager와 SoundManager가 함께 씁니다.
+
 **외부 컴파일 검증**
 - Unity가 켜져 있으면 배치 모드를 쓸 수 없습니다. 그래서 scratchpad의 `compile-check.ps1`으로 Unity 내장 Roslyn(`Data/DotNetSdkRoslyn/csc.dll`)을 써서 5개 어셈블리를 컴파일합니다.
 - 참조에는 netstandard와 mscorlib shim, Managed/UnityEngine, ScriptAssemblies를 씁니다.
 - 2026-10-26 기준 에러 0, 경고 0입니다.
+- **스크립트 개선(2026-10-27):**
+  - asmdef의 references만 참조로 넘겨서 asmdef 참조 누락도 잡습니다.
+  - Unity가 Addressables를 아직 받지 않았다면 scratchpad `stubs/`의 스텁(4.1.1 소스 시그니처를 옮긴 것)으로 컴파일합니다.
+  - 결과는 패키지 3개 에러 0, 경고 0이고, Dev는 CS0649 경고만 있습니다.
+- **인코딩 주의:** PowerShell 5.1은 BOM 없는 UTF-8 .ps1의 한글 문자열을 깨뜨립니다. 스크립트 안의 문자열은 영어로 씁니다.
 
 ### 테스트 (`Tests/Editor/`)
 
-- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 17개, `UIBaseTests` 2개, `UIAutoMapperTests` 13개(Unity 검증 안 됨, 총 72개). `FadeTransition`과 뒤로가기 키 입력은 자동 테스트가 없습니다. 테스트용 팝업은 `Tests/Editor/TestPopups/`에 둡니다(파일 하나에 클래스 하나).
+- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 21개, `UIBaseTests` 2개, `UIAutoMapperTests` 16개, `SoundManagerTests` 14개(Unity 검증 안 됨, 총 93개). `FakeAssetLoader`(Tests/Editor)는 로드와 반환을 기록하는 가짜 로더입니다. 실제 Addressables 로드와 `AssetLoader`는 자동 테스트가 없습니다.
+- **asmdef 참조 수정:** 테스트 asmdef에 빠져 있던 `UnityEngine.UI` 참조를 2026-10-27에 추가했습니다.. `FadeTransition`과 뒤로가기 키 입력은 자동 테스트가 없습니다. 테스트용 팝업은 `Tests/Editor/TestPopups/`에 둡니다(파일 하나에 클래스 하나).
 - **SceneService 테스트 방식:** 가짜 `ISceneLoader`와 `ISceneTransition`을 넣고, 즉시 완료되는 Awaitable로 동기 검증합니다.
 - **의도된 에러 로그:** `EventBusTests`의 `handler failed` 예외 로그도 `LogAssert.Expect`로 검증하는 의도된 로그입니다.
 - **비동기 처리:** 테스트 서비스가 모두 즉시 완료되므로 `InitializeAsync().GetAwaiter()`로 동기 검증합니다. async 테스트 지원 여부에 의존하지 않으려고 이렇게 했습니다.
