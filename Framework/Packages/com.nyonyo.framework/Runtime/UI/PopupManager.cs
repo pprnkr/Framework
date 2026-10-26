@@ -161,7 +161,7 @@ namespace Nyonyo.Framework.UI
         }
 
         /// <summary>
-        /// 뒤로가기를 처리합니다. 가장 위 팝업부터 <see cref="PopupBase.BackKey"/> 설정에 따라 닫거나 막거나 건너뜁니다.
+        /// 뒤로가기를 처리합니다. 보이는 팝업 중 가장 위 팝업부터 <see cref="PopupBase.BackKey"/> 설정에 따라 닫거나 막거나 건너뜁니다.
         /// </summary>
         /// <returns>팝업이 뒤로가기를 처리했으면 true, 처리할 팝업이 없으면 false입니다.</returns>
         public bool HandleBack()
@@ -171,6 +171,10 @@ namespace Nyonyo.Framework.UI
                 var popups = GetOpenPopupList(layer);
                 for (var i = popups.Count - 1; i >= 0; i--)
                 {
+                    // Hide()로 숨겨 둔 팝업은 뒤로가기 대상에서 빠집니다.
+                    if (!popups[i].IsVisible)
+                        continue;
+
                     switch (popups[i].BackKey)
                     {
                         case BackKeyBehavior.Ignore:

@@ -10,7 +10,7 @@ namespace Nyonyo.Framework.Editor.Tests
 
         protected override void OnOpen() => Log.Add("open");
 
-        protected override void OnButtonEvent(Button button)
+        public override void OnButtonEvent(Button button)
         {
             Log.Add($"button:{button.name}");
             base.OnButtonEvent(button);

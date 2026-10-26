@@ -2,7 +2,8 @@
     "name": "Nyonyo.Framework.Editor",
     "rootNamespace": "Nyonyo.Framework.Editor",
     "references": [
-        "Nyonyo.Framework"
+        "Nyonyo.Framework",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"

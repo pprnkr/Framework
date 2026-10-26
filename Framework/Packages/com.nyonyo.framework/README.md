@@ -202,26 +202,38 @@ UI를 5개 층(`UILayer`)으로 나눠 그립니다. 높은 층은 항상 낮은
 
 씬 전환 페이드(30000)는 모든 층보다 위에 그려집니다.
 
+### 클래스 구조
+
+| 클래스 | 담당 |
+|---|---|
+| `UIBase` | 모든 UI의 기본. 표시/숨김(`Show`, `Hide`, `OnShow`, `OnHide`), 버튼 이벤트(`public virtual OnButtonEvent(Button)`), 에디터 자동 매핑 |
+| `PopupBase : UIBase` | 팝업. 층, 뒤로가기, 닫기(`Close`, `OnOpen`, `Closed`, `WaitUntilClosedAsync`) |
+
+팝업 안에서 따로 동작하는 큰 UI 묶음(탭, 목록 항목 등)은 `UIBase`를 상속한 별도 스크립트로 만들어 자식 오브젝트에 붙입니다.
+
 ### 1. 팝업 만들기
 
-`PopupBase`를 상속한 컴포넌트를 프리팹 루트에 붙입니다. 프리팹 루트는 Canvas가 아니라 일반 RectTransform이어야 합니다.
+`PopupBase`를 상속한 컴포넌트를 프리팹 루트에 붙입니다. 프리팹 루트는 Canvas가 아니라 일반 RectTransform이어야 합니다. 직접 작성해도 되지만, 아래 [자동 매퍼](#ui-자동-매퍼-에디터)로 만드는 걸 추천합니다.
 
 ```csharp
 public class PopupTest : PopupBase
 {
     protected override void OnOpen() { /* 생성 직후 초기화 */ }
 
-    // 팝업 안의 모든 버튼 클릭이 여기로 모입니다.
-    protected override void OnButtonEvent(Button button)
+    // 버튼 OnClick에 연결하면 모든 버튼 클릭이 여기로 모입니다.
+    public override void OnButtonEvent(Button button)
     {
         switch (button.name)
         {
-            case "OkButton": Close(); break;
-            default: base.OnButtonEvent(button); break;  // 닫기 버튼 처리
+            case "BTN_Ok": Close(); break;
+            default: base.OnButtonEvent(button); break;
         }
     }
 }
 ```
+
+- **버튼 연결:** 버튼 클릭은 자동으로 연결되지 않습니다. Button의 **OnClick**에 `OnButtonEvent`를 연결하고 인자로 그 Button을 넘기세요. 자동 매퍼의 **Assign Object**를 쓰면 `BTN_` 버튼은 자동으로 연결됩니다.
+- **닫기 버튼:** OnClick에 `Close`를 직접 연결하거나 `OnButtonEvent`에서 `Close()`를 호출하세요.
 
 인스펙터에서는 다음 항목을 설정합니다.
 
@@ -230,7 +242,6 @@ public class PopupTest : PopupBase
 | **Layer** | 기본으로 뜰 층 |
 | **Back Key** | 뒤로가기 키 동작. `Close`(닫기), `Block`(막기), `Ignore`(건너뛰기) 중에서 고릅니다. |
 | **Close On Scene Change** | 씬이 바뀔 때 자동으로 닫을지 여부 |
-| **Close Button** | 누르면 팝업을 닫는 버튼 |
 
 `Close()`는 팝업 오브젝트를 `Destroy`합니다. `Close()`를 재정의할 때는 마지막에 `base.Close()`를 호출하세요.
 
@@ -271,8 +282,71 @@ PopupManager.Instance.CloseAll(UILayer.Popup);  // 층을 생략하면 전부 �
 ```
 
 - **`PopupManager.Instance`:** `Services.Get<PopupManager>()`의 줄임말입니다. 싱글톤이 아니어서 도메인 리로드를 꺼도 안전합니다.
-- **뒤로가기 키:** ESC 키와 안드로이드 뒤로가기는 가장 위 팝업부터 `Back Key` 설정대로 처리합니다. 닫을 팝업이 없으면 `BackKeyUnhandled` 이벤트가 호출됩니다. 게임 종료 확인창을 띄울 때 쓰면 됩니다.
+- **뒤로가기 키:** ESC 키와 안드로이드 뒤로가기는 보이는 팝업 중 가장 위 팝업부터 `Back Key` 설정대로 처리합니다. `Hide()`로 숨긴 팝업은 건너뜁니다. 닫을 팝업이 없으면 `BackKeyUnhandled` 이벤트가 호출됩니다. 게임 종료 확인창을 띄울 때 쓰면 됩니다.
 - **팝업이 아닌 UI:** HUD처럼 팝업이 아닌 UI를 같은 층 규칙으로 그리려면 `GetLayerRoot(UILayer.Screen)`의 자식으로 붙이세요.
+
+## UI 자동 매퍼 (에디터)
+
+프리팹의 게임오브젝트 이름에 접두사(`IMG_`, `TXT_` 등)를 붙여 두면, 그 오브젝트를 담는 변수를 스크립트에 자동으로 만들고 연결합니다.
+
+### 접두사 규칙
+
+규칙은 `UIPrefixSettings` 에셋에서 관리합니다. 처음 사용할 때 `Assets/Editor/UIPrefixSettings.asset`이 기본값으로 만들어지고, **Create > Nyonyo Framework > UI Prefix Settings**로 직접 만들 수도 있습니다.
+
+| 접두사 | 변수 타입 |
+|---|---|
+| `IMG_` | `Image` |
+| `RIMG_` | `RawImage` |
+| `TXT_` | `TextMeshProUGUI` |
+| `BTN_` | `Button` |
+| `TGL_` | `Toggle` |
+| `SLD_` | `Slider` |
+| `SCR_` | `ScrollRect` |
+| `INP_` | `TMP_InputField` |
+| `DRP_` | `TMP_Dropdown` |
+| `RT_` | `RectTransform` |
+| `GO_` | `GameObject` |
+| `UI_` | 오브젝트에 붙은 `UIBase` 하위 클래스(자식 UI) |
+
+- **타입 이름:** 타입은 전체 이름(예: `UnityEngine.UI.Image`)으로 적습니다.
+- **접두사가 겹칠 때:** 여러 접두사가 맞으면 가장 긴 접두사를 씁니다.
+- **기타 설정:** 새 스크립트의 namespace와 버튼 클릭 자동 연결 여부도 이 에셋에서 정합니다.
+
+### 1. 새 스크립트 만들기
+
+1. 프리팹을 구성하고 오브젝트 이름에 접두사를 붙입니다. 예: `IMG_A`, `TXT_B`, `BTN_Ok`.
+2. Project 창에서 프리팹을 선택하거나 프리팹 모드를 연 상태에서 메뉴를 실행합니다.
+   - **Tools > Create UI Script > Popup**: `PopupBase`를 상속한 스크립트를 만듭니다.
+   - **Tools > Create UI Script > UI**: `UIBase`를 상속한 스크립트를 만듭니다. 팝업 안에서 쓰는 자식 UI용입니다.
+3. 저장 위치를 고릅니다. 파일 이름은 프리팹 이름이 기본값이고, 파일 이름이 곧 클래스 이름이 됩니다.
+4. 컴파일이 끝나면 스크립트가 프리팹 루트에 자동으로 붙고, 오브젝트도 변수에 자동으로 연결됩니다.
+
+```csharp
+public class Test : PopupBase
+{
+    #region Auto Generated UI
+    #pragma warning disable CS0169, CS0649
+    [SerializeField] private Image IMG_A;
+    [SerializeField] private TextMeshProUGUI TXT_B;
+    [SerializeField] private Button BTN_Ok;
+    #pragma warning restore CS0169, CS0649
+    #endregion
+    ...
+}
+```
+
+### 2. 인스펙터 버튼
+
+`UIBase`를 상속한 컴포넌트의 인스펙터에 두 버튼이 나타납니다.
+
+| 버튼 | 동작 |
+|---|---|
+| **Generate Script** | 현재 자식 오브젝트로 `#region Auto Generated UI` 영역만 다시 씁니다. 영역 밖에 직접 쓴 코드는 그대로 남습니다. 스크립트가 바뀌면 컴파일 후 자동으로 연결합니다. |
+| **Assign Object** | 접두사 오브젝트를 같은 이름의 변수에 연결합니다. `BTN_` 버튼은 OnClick에 `OnButtonEvent`도 연결합니다. 이미 연결된 것은 다시 추가하지 않습니다. |
+
+- **자식 UI:** 자식 오브젝트에 다른 `UIBase`가 붙어 있으면 그 자식까지만 포함합니다. 그 아래 오브젝트는 자식 UI의 스크립트가 관리합니다.
+- **오브젝트 이름:** 오브젝트 이름이 곧 변수 이름입니다. 같은 UI 안에서 이름이 겹치면 첫 번째만 쓰고 경고를 띄웁니다.
+- **어셈블리 참조:** 스크립트를 asmdef가 있는 폴더에 저장한다면, 그 asmdef가 `Nyonyo.Framework`, `UnityEngine.UI`, `Unity.TextMeshPro`를 참조해야 합니다.
 
 ## 개발
 

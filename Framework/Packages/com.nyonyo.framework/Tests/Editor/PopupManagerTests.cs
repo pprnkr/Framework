@@ -6,7 +6,6 @@ using Nyonyo.Framework.UI;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.UI;
 using Object = UnityEngine.Object;
 
 namespace Nyonyo.Framework.Editor.Tests
@@ -55,13 +54,6 @@ namespace Nyonyo.Framework.Editor.Tests
             var go = new GameObject(name, typeof(RectTransform));
             _cleanup.Add(go);
             return go.AddComponent<T>();
-        }
-
-        Button AddButton(PopupBase template, string name)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(Button));
-            go.transform.SetParent(template.transform, false);
-            return go.GetComponent<Button>();
         }
 
         static void SetSerialized(Object target, string propertyName, Action<SerializedProperty> set)
@@ -168,27 +160,16 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
-        public void ButtonClick_CallsOnButtonEvent()
+        public void HandleBack_SkipsHiddenPopups()
         {
-            AddButton(_prefabA, "OkButton");
-            var popup = _manager.Show<TestPopupA>();
+            var lower = _manager.Show<TestPopupA>(UILayer.Popup);
+            var hidden = _manager.Show<TestPopupB>(UILayer.System);
+            hidden.Hide();
 
-            popup.GetComponentInChildren<Button>().onClick.Invoke();
+            Assert.IsTrue(_manager.HandleBack());
 
-            CollectionAssert.Contains(popup.Log, "button:OkButton");
-            Assert.IsFalse(popup.IsClosed);
-        }
-
-        [Test]
-        public void CloseButton_ClosesPopup()
-        {
-            var closeButton = AddButton(_prefabA, "CloseButton");
-            SetSerialized(_prefabA, "_closeButton", p => p.objectReferenceValue = closeButton);
-            var popup = _manager.Show<TestPopupA>();
-
-            popup.GetComponentInChildren<Button>().onClick.Invoke();
-
-            Assert.IsTrue(popup == null);
+            Assert.IsTrue(lower == null);
+            Assert.IsTrue(hidden != null);
         }
 
         [Test]

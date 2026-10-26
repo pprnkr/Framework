@@ -1,19 +1,18 @@
 using System;
 using System.Threading;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace Nyonyo.Framework.UI
 {
     /// <summary>
-    /// 모든 팝업의 기본 클래스입니다. 상속한 컴포넌트를 프리팹 루트에 붙이고, <see cref="UISettings"/>에 등록하세요.
+    /// 모든 팝업의 기본 클래스입니다. 팝업 층, 뒤로가기, 닫기를 담당합니다.
+    /// 상속한 컴포넌트를 프리팹 루트에 붙이고, <see cref="UISettings"/>에 등록하세요.
     /// </summary>
     /// <remarks>
-    /// 팝업 안의 모든 <see cref="Button"/> 클릭은 <see cref="OnButtonEvent"/> 하나로 모입니다.
     /// <see cref="Close"/>는 팝업 오브젝트를 Destroy하므로, 닫힌 팝업은 메모리에 남지 않습니다.
+    /// 닫기 버튼은 OnClick에 <see cref="Close"/>를 직접 연결하거나, <see cref="UIBase.OnButtonEvent"/>에서 처리하세요.
     /// </remarks>
-    [DisallowMultipleComponent]
-    public abstract class PopupBase : MonoBehaviour
+    public abstract class PopupBase : UIBase
     {
         [Tooltip("팝업이 그려질 층입니다. Show에서 층을 직접 지정하면 그 값이 우선합니다.")]
         [SerializeField] UILayer _layer = UILayer.Popup;
@@ -23,9 +22,6 @@ namespace Nyonyo.Framework.UI
 
         [Tooltip("씬이 바뀌면 자동으로 닫을지 여부입니다.")]
         [SerializeField] bool _closeOnSceneChange = true;
-
-        [Tooltip("누르면 팝업을 닫는 버튼입니다. 비워 둬도 됩니다.")]
-        [SerializeField] Button _closeButton;
 
         public UILayer Layer => _layer;
 
@@ -49,10 +45,6 @@ namespace Nyonyo.Framework.UI
         {
             Manager = manager;
             _layer = layer;
-
-            foreach (var button in GetComponentsInChildren<Button>(true))
-                button.onClick.AddListener(() => OnButtonEvent(button));
-
             OnOpen();
         }
 
@@ -61,30 +53,6 @@ namespace Nyonyo.Framework.UI
         /// </summary>
         protected virtual void OnOpen()
         {
-        }
-
-        /// <summary>
-        /// 팝업 안의 버튼이 눌리면 호출됩니다. 기본 동작은 닫기 버튼이면 팝업을 닫는 것입니다.
-        /// </summary>
-        /// <remarks>
-        /// 재정의할 때 처리하지 않은 버튼은 <c>base.OnButtonEvent(button)</c>으로 넘기세요.
-        /// </remarks>
-        /// <example>
-        /// <code>
-        /// protected override void OnButtonEvent(Button button)
-        /// {
-        ///     switch (button.name)
-        ///     {
-        ///         case "OkButton": Confirm(); break;
-        ///         default: base.OnButtonEvent(button); break;
-        ///     }
-        /// }
-        /// </code>
-        /// </example>
-        protected virtual void OnButtonEvent(Button button)
-        {
-            if (button == _closeButton)
-                Close();
         }
 
         /// <summary>
