@@ -71,7 +71,8 @@ Packages/com.nyonyo.framework/
 | 1 | 부트스트랩과 서비스 관리 | 완료, Unity 검증됨 |
 | 2 | 이벤트 시스템 (타입 기반 EventBus) | 완료, Unity 검증됨 |
 | 3 | 씬 관리 (비동기 로드, 페이드) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
-| 4 | UI 관리 (5단계 레이어, PopupManager, 뒤로가기) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
+| 4 | UI 관리 (5단계 레이어, PopupManager, 뒤로가기, UIBase) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
+| 4-1 | UI 자동 매퍼 (접두사 SO, Create UI Script 메뉴, Generate/Assign) | 완료 (외부 컴파일과 생성기 실행만 확인, Unity 검증 안 됨) |
 | 5 | 오디오 (BGM 크로스페이드, SFX 풀링, Mixer 볼륨) | **다음 작업** |
 | 6 | 저장/로드 (JSON, 슬롯, 버전 마이그레이션) | 예정 |
 | 7 | 풀링, FSM, 타이머 | 예정 |
@@ -177,7 +178,8 @@ Packages/com.nyonyo.framework/
 |---|---|
 | `UILayer` | `Screen`(0), `Popup`(1), `System`(2), `Notice`(3), `Top`(4). 층마다 ScreenSpaceOverlay Canvas를 두고, 정렬 순서는 1000 + 층×1000입니다. 페이드(30000)가 그 위에 그려집니다. |
 | `PopupManager` | `Show<T>(UILayer? layer)`, `Find<T>`, `IsOpen<T>`, `CloseAll(layer?)`, `HandleBack()`, `GetLayerRoot`, `GetOpenPopups`, `RegisterPrefab`, `BackKeyUnhandled` 이벤트를 제공합니다. `static Instance => Services.Get<PopupManager>()`(싱글톤 아님). |
-| `PopupBase` | virtual `OnOpen`, `OnButtonEvent(Button)`(기본은 닫기 버튼이면 Close), `Close()`(Destroy, Edit 모드에서는 DestroyImmediate). `Closed` 이벤트, `WaitUntilClosedAsync`. 직렬화 필드는 `_layer`, `_backKey`, `_closeOnSceneChange`, `_closeButton`입니다. |
+| `UIBase` | 모든 UI의 기본(DisallowMultipleComponent). `Show`/`Hide`(활성화 + `OnShow`/`OnHide` 훅), `IsVisible`, `public virtual OnButtonEvent(Button)`(기본은 아무것도 안 함) |
+| `PopupBase : UIBase` | 층, 뒤로가기, 닫기 담당. virtual `OnOpen`, `Close()`(Destroy, Edit 모드에서는 DestroyImmediate). `Closed` 이벤트, `WaitUntilClosedAsync`. 직렬화 필드는 `_layer`, `_backKey`, `_closeOnSceneChange`입니다. |
 | `UISettings` (SO) | 기준 해상도(1920x1080), match 0.5, 팝업 프리팹 목록, 뒤로가기 처리 여부 |
 | `BackKeyBehavior` | `Close`, `Block`(아래 팝업도 막음), `Ignore`(건너뜀, 띠알람용) |
 | `PopupBackKeyHandler` (internal) | Update에서 ESC를 확인합니다. Input System에서는 안드로이드 뒤로가기도 ESC로 들어옵니다. |
@@ -186,7 +188,8 @@ Packages/com.nyonyo.framework/
 
 **정렬과 생명주기**
 - **같은 층 정렬:** 같은 층의 정렬은 형제 순서로 정합니다(`SetAsLastSibling`). 그래서 팝업 프리팹 루트에 Canvas를 두면 안 됩니다.
-- **버튼 연결:** 버튼은 `Open` 시점에 연결합니다. Edit 모드에서는 Awake가 호출되지 않기 때문입니다.
+- **버튼 연결:** 런타임 `AddListener`를 쓰지 않습니다(사용자 요청, 2026-10-26). Button OnClick에 public `OnButtonEvent`를 persistent로 연결하며, 에디터 Assign Object가 `BTN_` 버튼을 자동으로 연결합니다. `_closeButton` 필드도 사용자 요청으로 제거했습니다.
+- **숨긴 팝업:** `HandleBack`은 `Hide()`로 숨긴(`!IsVisible`) 팝업을 건너뜁니다.
 - **목록 정리:** Close를 거치지 않고 Destroy된 팝업은 목록을 꺼낼 때 정리합니다(`RemoveAll(null)`).
 
 **입력과 씬 전환**
@@ -199,6 +202,32 @@ Packages/com.nyonyo.framework/
 - `PopupNotice`: Notice 층, 2초 뒤 자동으로 닫힘, BackKey Ignore.
 - `DevSampleSetup`: 메뉴 Tools > Nyonyo Framework > Dev > Setup Samples. 프리팹, DevUISettings, DevInstaller, FrameworkSettings 연결, SampleScene2, Scene List를 자동으로 준비합니다.
 
+## 구현 완료: UI 자동 매퍼 (`Editor/UI/`, 네임스페이스 `Nyonyo.Framework.Editor.UI`, 에디터 전용)
+
+사용자 요구사항(2026-10-26):
+- 프리팹 오브젝트 이름에 접두사(IMG_, TXT_ 등)를 붙이면, 스크립트 상단 `#region`에 `[SerializeField] private Image IMG_A;` 형태로 변수를 만듭니다.
+- TXT_는 TextMeshPro로 만들고, 접두사 규칙은 SO로 관리합니다.
+- 메뉴 Tools/Create UI Script/Popup 또는 UI로 상속 대상을 고릅니다. 경로는 저장 창에서 정하고, 스크립트 이름의 기본값은 프리팹 이름입니다.
+- UIBase 하위 컴포넌트 인스펙터에 Generate Script와 Assign Object 버튼을 둡니다.
+- UIBase를 상속하는 스크립트는 팝업 안의 자식 UI용입니다.
+
+| 타입 | 역할 |
+|---|---|
+| `UIPrefixSettings` (SO, public) | 접두사 규칙(`Rule`: prefix, 타입 전체 이름), `ScriptNamespace`, `BindButtonClick`. `GetOrCreate()`가 없으면 `Assets/Editor/UIPrefixSettings.asset`을 만듭니다. 가장 긴 접두사가 우선합니다. |
+| `UITypeResolver` | 타입 전체 이름을 `TypeCache` Component 타입에서 찾습니다. `UnityEngine.GameObject`는 따로 처리합니다. |
+| `UIBindingCollector` (internal) | 루트의 자식을 계층 순서로 훑습니다. 자식에 UIBase가 있으면 그 자식만 포함하고 아래는 건너뜁니다. 필드 타입은 실제 컴포넌트 타입입니다(UI_는 구체 클래스). 이름이 겹치거나 컴포넌트가 없으면 경고 후 건너뜁니다. |
+| `UIScriptGenerator` (internal) | `CreateScript`(using, namespace, region, PopupBase면 OnOpen, `OnButtonEvent`의 `switch(button.name)`와 BTN_ case). `UpdateScript`는 region만 교체하고, 없으면 클래스 `{` 다음에 삽입하며 빠진 using을 추가합니다. 줄바꿈 스타일은 유지합니다. region 안은 `#pragma warning disable CS0169, CS0649`로 감쌉니다. |
+| `UIAutoMapper` (public) | `Assign(UIBase, settings?)`: SerializedObject로 필드를 연결하고(타입이 안 맞으면 경고), BTN_ OnClick에 `OnButtonEvent` persistent listener를 겹치지 않게 연결합니다. `GenerateScript(UIBase)`: 스크립트 region을 갱신하고, 바뀌었으면 컴파일 후 자동으로 Assign합니다(SessionState pending + `[DidReloadScripts]` + delayCall). 프리팹 모드면 stage root를 대상으로 하고, 아니면 `LoadPrefabContents`/`SaveAsPrefabAsset`을 씁니다. |
+| `UIScriptMenu` | Tools/Create UI Script/Popup, UI. 대상은 프리팹 모드 또는 Project에서 선택한 프리팹입니다. 기존 UIBase가 있으면 거부합니다. `SaveFilePanelInProject`로 경로를 받고(마지막 폴더는 EditorPrefs에 기억), 클래스 이름 유효성과 중복을 검사합니다. 컴파일 후 컴포넌트를 추가하고 Assign합니다. |
+| `UIBaseEditor` | `[CustomEditor(typeof(UIBase), true)]`. Generate Script와 Assign Object 버튼이 있고, 동작은 delayCall로 실행합니다. |
+| `UIPrefixSettingsEditor` | 찾을 수 없는 타입, 빈 접두사, 중복 접두사를 경고합니다. |
+
+참고 사항:
+- **Editor 어셈블리 참조:** Editor asmdef에 `UnityEngine.UI` 참조를 추가했습니다.
+- **네임스페이스 주의:** `Nyonyo.Framework.Editor` 네임스페이스 안에서는 `Editor`가 네임스페이스로 해석됩니다. 그래서 커스텀 에디터는 `UnityEditor.Editor`를 전체 이름으로 상속합니다.
+- **개발용 샘플:** Dev 샘플 `PopupTest`는 자동 생성 영역(RT_Panel, BTN_*)을 씁니다. `DevSampleSetup`이 `UIAutoMapper.Assign`으로 필드와 버튼을 연결합니다. 샘플 텍스트는 legacy Text라서 TXT_를 붙이지 않았습니다.
+- **생성기 결과 확인:** scratchpad의 `harness/`(.NET 10 콘솔)로 컴파일된 Editor DLL의 `UIScriptGenerator`를 리플렉션으로 실행해서 생성 결과를 확인했습니다.
+
 **외부 컴파일 검증**
 - Unity가 켜져 있으면 배치 모드를 쓸 수 없습니다. 그래서 scratchpad의 `compile-check.ps1`으로 Unity 내장 Roslyn(`Data/DotNetSdkRoslyn/csc.dll`)을 써서 5개 어셈블리를 컴파일합니다.
 - 참조에는 netstandard와 mscorlib shim, Managed/UnityEngine, ScriptAssemblies를 씁니다.
@@ -206,7 +235,7 @@ Packages/com.nyonyo.framework/
 
 ### 테스트 (`Tests/Editor/`)
 
-- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 18개(Unity 검증 안 됨, 총 58개). `FadeTransition`과 뒤로가기 키 입력은 자동 테스트가 없습니다. 테스트용 팝업은 `Tests/Editor/TestPopups/`에 둡니다(파일 하나에 클래스 하나).
+- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 17개, `UIBaseTests` 2개, `UIAutoMapperTests` 13개(Unity 검증 안 됨, 총 72개). `FadeTransition`과 뒤로가기 키 입력은 자동 테스트가 없습니다. 테스트용 팝업은 `Tests/Editor/TestPopups/`에 둡니다(파일 하나에 클래스 하나).
 - **SceneService 테스트 방식:** 가짜 `ISceneLoader`와 `ISceneTransition`을 넣고, 즉시 완료되는 Awaitable로 동기 검증합니다.
 - **의도된 에러 로그:** `EventBusTests`의 `handler failed` 예외 로그도 `LogAssert.Expect`로 검증하는 의도된 로그입니다.
 - **비동기 처리:** 테스트 서비스가 모두 즉시 완료되므로 `InitializeAsync().GetAwaiter()`로 동기 검증합니다. async 테스트 지원 여부에 의존하지 않으려고 이렇게 했습니다.

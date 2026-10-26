@@ -175,6 +175,7 @@
     <a href="#events">이벤트 <span class="badge done">검증됨</span></a>
     <a href="#scenes">씬 관리 <span class="badge check">확인 필요</span></a>
     <a href="#ui">UI · 팝업 <span class="badge check">확인 필요</span></a>
+    <a href="#mapper">UI 자동 매퍼 <span class="badge check">확인 필요</span></a>
     <a href="#dev">개발용 샘플</a>
     <h4>예정 기능</h4>
     <a href="#audio">오디오</a>
@@ -202,6 +203,7 @@
       <tr><td>이벤트 (EventBus)</td><td><code>Nyonyo.Framework.Events</code></td><td><span class="badge done">완료 · Unity 검증됨</span></td></tr>
       <tr><td>씬 관리</td><td><code>Nyonyo.Framework.Scenes</code></td><td><span class="badge check">완료 · Unity 확인 필요</span></td></tr>
       <tr><td>UI · 팝업 (5단계 레이어)</td><td><code>Nyonyo.Framework.UI</code></td><td><span class="badge check">완료 · Unity 확인 필요</span></td></tr>
+      <tr><td>UI 자동 매퍼 (에디터)</td><td><code>Nyonyo.Framework.Editor.UI</code></td><td><span class="badge check">완료 · Unity 확인 필요</span></td></tr>
       <tr><td>오디오</td><td>—</td><td><span class="badge plan">예정</span></td></tr>
       <tr><td>저장/로드</td><td>—</td><td><span class="badge plan">예정</span></td></tr>
       <tr><td>풀링 · FSM · 타이머</td><td>—</td><td><span class="badge plan">예정</span></td></tr>
@@ -378,8 +380,18 @@ float progress = scenes.Progress;   <span class="c">// 0~1</span></code></pre>
       <div class="layer fade"><b>Scene Fade</b><span>씬 전환 페이드 · 30000</span></div>
     </div>
 
+    <h3>클래스 구조</h3>
+    <div class="table-wrap">
+    <table>
+      <tr><th>클래스</th><th>담당</th></tr>
+      <tr><td><code>UIBase</code></td><td>모든 UI의 기본. 표시/숨김(<code>Show</code>, <code>Hide</code>, <code>OnShow</code>, <code>OnHide</code>), 버튼 이벤트(<code>public virtual OnButtonEvent(Button)</code>), 자동 매핑 대상</td></tr>
+      <tr><td><code>PopupBase : UIBase</code></td><td>팝업. 층, 뒤로가기, 닫기(<code>Close</code>, <code>OnOpen</code>, <code>Closed</code>, <code>WaitUntilClosedAsync</code>)</td></tr>
+    </table>
+    </div>
+    <p>팝업 안에서 따로 동작하는 큰 UI 묶음(탭, 목록 항목 등)은 <code>UIBase</code>를 상속한 별도 스크립트로 만들어 자식 오브젝트에 붙입니다.</p>
+
     <h3>1. 팝업 만들기</h3>
-    <p><code>PopupBase</code>를 상속한 컴포넌트를 <b>프리팹 루트</b>에 붙입니다. 이때 루트는 Canvas가 아닌 일반 RectTransform이어야 합니다.</p>
+    <p><code>PopupBase</code>를 상속한 컴포넌트를 <b>프리팹 루트</b>에 붙입니다. 이때 루트는 Canvas가 아닌 일반 RectTransform이어야 합니다. 직접 작성해도 되지만 <a href="#mapper">UI 자동 매퍼</a>로 만드는 걸 추천합니다.</p>
 <pre><code>using Nyonyo.Framework.UI;
 using UnityEngine.UI;
 
@@ -390,16 +402,16 @@ public class PopupTest : PopupBase
         <span class="c">// 생성 직후 초기화</span>
     }
 
-    <span class="c">// 팝업 안의 모든 버튼 클릭이 여기로 모입니다.</span>
-    protected override void OnButtonEvent(Button button)
+    <span class="c">// 버튼 OnClick에 연결하면 모든 버튼 클릭이 여기로 모입니다.</span>
+    public override void OnButtonEvent(Button button)
     {
         switch (button.name)
         {
-            case "OkButton":
+            case "BTN_Ok":
                 Close();
                 break;
             default:
-                base.OnButtonEvent(button);   <span class="c">// 닫기 버튼(Close Button) 처리</span>
+                base.OnButtonEvent(button);
                 break;
         }
     }
@@ -416,8 +428,11 @@ public class PopupTest : PopupBase
       <tr><td>Layer</td><td>기본으로 뜰 층</td></tr>
       <tr><td>Back Key</td><td><code>Close</code>는 닫기, <code>Block</code>은 막기(아래 팝업도 안 닫힘), <code>Ignore</code>는 건너뛰기(띠알람용)</td></tr>
       <tr><td>Close On Scene Change</td><td>씬이 바뀔 때 자동으로 닫을지 여부</td></tr>
-      <tr><td>Close Button</td><td>누르면 팝업을 닫는 버튼</td></tr>
     </table>
+    </div>
+    <div class="note">
+      <strong>버튼 클릭은 자동으로 연결되지 않습니다</strong>
+      Button의 OnClick에 <code>OnButtonEvent</code>를 연결하고 인자로 그 Button을 넘기세요. <a href="#mapper">Assign Object</a>를 쓰면 <code>BTN_</code> 버튼은 자동으로 연결됩니다. 닫기 버튼은 OnClick에 <code>Close</code>를 직접 연결해도 됩니다.
     </div>
 
     <h3>2. 등록하기</h3>
@@ -457,6 +472,87 @@ hud.SetParent(PopupManager.Instance.GetLayerRoot(UILayer.Screen), false);</code>
       <li><b>메모리 해제:</b> <code>Close()</code>는 팝업을 <code>Destroy</code>합니다. 닫힌 팝업은 메모리에 남지 않습니다.</li>
       <li><b>뒤로가기:</b> ESC와 안드로이드 뒤로가기는 가장 위 팝업부터 Back Key 설정대로 처리합니다.</li>
       <li><b>EventSystem:</b> Play 중에 EventSystem이 없으면 PopupManager가 만들어서 유지합니다. <b>씬에는 EventSystem을 두지 마세요.</b></li>
+    </ul>
+  </section>
+
+  <section id="mapper">
+    <h2>UI 자동 매퍼 <span class="badge check">확인 필요</span></h2>
+    <div class="ns">Editor/UI · <code>Nyonyo.Framework.Editor.UI</code> (에디터 전용)</div>
+    <p>프리팹의 게임오브젝트 이름에 접두사를 붙여 두면, 그 오브젝트를 담는 변수를 스크립트에 자동으로 만들고 연결합니다.</p>
+
+    <h3>1. 새 스크립트 만들기</h3>
+    <ol>
+      <li>프리팹을 구성하면서 오브젝트 이름에 접두사를 붙입니다. 예: <code>IMG_A</code>, <code>TXT_B</code>, <code>BTN_Ok</code>.</li>
+      <li>Project 창에서 프리팹을 선택하거나 프리팹 모드를 연 상태에서 메뉴를 실행합니다.
+        <ul>
+          <li><b>Tools › Create UI Script › Popup</b>: <code>PopupBase</code>를 상속합니다.</li>
+          <li><b>Tools › Create UI Script › UI</b>: <code>UIBase</code>를 상속합니다. 팝업 안에서 쓰는 자식 UI용입니다.</li>
+        </ul>
+      </li>
+      <li>저장 위치 창에서 경로를 고릅니다. 파일 이름은 <b>프리팹 이름</b>이 기본값이고, 파일 이름이 곧 클래스 이름이 됩니다.</li>
+      <li>컴파일이 끝나면 스크립트가 프리팹 루트에 자동으로 붙고, 오브젝트도 변수에 자동으로 연결됩니다.</li>
+    </ol>
+<pre><code>using Nyonyo.Framework.UI;
+using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
+
+public class Test : PopupBase
+{
+    #region Auto Generated UI
+    #pragma warning disable CS0169, CS0649
+    [SerializeField] private Image IMG_A;
+    [SerializeField] private TextMeshProUGUI TXT_B;
+    [SerializeField] private Button BTN_Ok;
+    #pragma warning restore CS0169, CS0649
+    #endregion
+
+    protected override void OnOpen()
+    {
+    }
+
+    public override void OnButtonEvent(Button button)
+    {
+        switch (button.name)
+        {
+            case "BTN_Ok":
+                break;
+            default:
+                base.OnButtonEvent(button);
+                break;
+        }
+    }
+}</code></pre>
+
+    <h3>2. 인스펙터 버튼</h3>
+    <p><code>UIBase</code>를 상속한 모든 컴포넌트(팝업 포함)의 인스펙터에 나타납니다.</p>
+    <div class="table-wrap">
+    <table>
+      <tr><th>버튼</th><th>동작</th></tr>
+      <tr><td><b>Generate Script</b></td><td>현재 자식 오브젝트로 <code>#region Auto Generated UI</code> 영역만 다시 씁니다. 영역 밖에 직접 쓴 코드는 그대로 남습니다. 스크립트가 바뀌면 컴파일 후 자동으로 연결합니다.</td></tr>
+      <tr><td><b>Assign Object</b></td><td>접두사 오브젝트를 같은 이름의 변수에 연결합니다. <code>BTN_</code> 버튼은 OnClick에 <code>OnButtonEvent</code>도 연결합니다. 이미 연결된 것은 다시 추가하지 않습니다.</td></tr>
+    </table>
+    </div>
+
+    <h3>3. 접두사 규칙 (UIPrefixSettings)</h3>
+    <p>처음 사용할 때 <code>Assets/Editor/UIPrefixSettings.asset</code>이 만들어집니다. 접두사를 추가하거나 바꿀 수 있고, 타입은 전체 이름으로 적습니다. 인스펙터에서 찾을 수 없는 타입을 알려 줍니다.</p>
+    <div class="table-wrap">
+    <table>
+      <tr><th>접두사</th><th>타입</th><th>접두사</th><th>타입</th></tr>
+      <tr><td><code>IMG_</code></td><td>Image</td><td><code>SCR_</code></td><td>ScrollRect</td></tr>
+      <tr><td><code>RIMG_</code></td><td>RawImage</td><td><code>INP_</code></td><td>TMP_InputField</td></tr>
+      <tr><td><code>TXT_</code></td><td>TextMeshProUGUI</td><td><code>DRP_</code></td><td>TMP_Dropdown</td></tr>
+      <tr><td><code>BTN_</code></td><td>Button</td><td><code>RT_</code></td><td>RectTransform</td></tr>
+      <tr><td><code>TGL_</code></td><td>Toggle</td><td><code>GO_</code></td><td>GameObject</td></tr>
+      <tr><td><code>SLD_</code></td><td>Slider</td><td><code>UI_</code></td><td>자식 UI (UIBase 하위 클래스)</td></tr>
+    </table>
+    </div>
+    <ul>
+      <li><b>자식 UI:</b> 자식 오브젝트에 다른 <code>UIBase</code>가 붙어 있으면 그 자식까지만 포함합니다. 그 아래 오브젝트는 자식 UI의 스크립트가 관리합니다. 예를 들어 <code>UI_Inventory</code> 아래의 <code>IMG_Slot</code>은 Inventory 스크립트에 들어갑니다.</li>
+      <li><b>접두사가 겹칠 때:</b> 여러 접두사가 맞으면 가장 긴 접두사를 씁니다.</li>
+      <li><b>이름이 겹칠 때:</b> 같은 UI 안에서 이름이 겹치면 첫 번째만 쓰고 경고를 띄웁니다.</li>
+      <li><b>namespace:</b> 새 스크립트의 namespace는 설정 에셋의 <b>Script Namespace</b>로 정합니다.</li>
+      <li><b>어셈블리 참조:</b> asmdef가 있는 폴더에 저장한다면, 그 asmdef가 <code>Nyonyo.Framework</code>, <code>UnityEngine.UI</code>, <code>Unity.TextMeshPro</code>를 참조해야 합니다.</li>
     </ul>
   </section>
 
@@ -555,6 +651,7 @@ timers.Every(0.5f, Tick, unscaled: true);</code></pre>
       <li><b>EventSystem:</b> 씬에 EventSystem을 두지 않습니다. PopupManager가 관리합니다.</li>
       <li><b>팝업 프리팹:</b> 팝업 프리팹 루트에 Canvas를 두지 않습니다. 같은 층 정렬은 형제 순서로 정하기 때문입니다.</li>
       <li><b>Close 재정의:</b> <code>PopupBase.Close()</code>를 재정의하면 마지막에 <code>base.Close()</code>를 호출합니다.</li>
+      <li><b>자동 생성 영역:</b> <code>#region Auto Generated UI</code> 안은 Generate Script가 덮어씁니다. 직접 쓰는 코드는 영역 밖에 두세요.</li>
       <li><b>.meta 커밋:</b> 패키지 파일의 <code>.meta</code>는 반드시 커밋합니다. 없으면 git으로 설치할 때 에러가 납니다.</li>
     </ul>
   </section>

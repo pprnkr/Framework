@@ -1,6 +1,7 @@
 using System.IO;
 using System.Linq;
 using Nyonyo.Framework;
+using Nyonyo.Framework.Editor.UI;
 using Nyonyo.Framework.UI;
 using UnityEditor;
 using UnityEngine;
@@ -48,7 +49,9 @@ namespace Nyonyo.Dev.Editor
             Stretch(dim);
             dim.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.5f);
 
-            var panel = CreateUI("Panel", root, typeof(Image));
+            // 접두사 이름(RT_, BTN_)을 붙여 두면 UIAutoMapper.Assign이 필드와 버튼 클릭을 자동으로 연결합니다.
+            // 샘플 텍스트는 TMP 기본 리소스 없이도 보이도록 기존 Text를 쓰므로 TXT_ 접두사를 붙이지 않습니다.
+            var panel = CreateUI("RT_Panel", root, typeof(Image));
             panel.sizeDelta = new Vector2(760f, 420f);
             panel.GetComponent<Image>().color = new Color(0.95f, 0.95f, 0.95f, 1f);
 
@@ -56,13 +59,12 @@ namespace Nyonyo.Dev.Editor
             CreateText(panel, "Body", "Open Another: stacks on the same layer.\nShow Notice: band alarm on the Notice layer.",
                 26, new Vector2(0f, 40f), new Vector2(700f, 120f));
 
-            CreateButton(panel, "StackButton", "Open Another", new Vector2(-240f, -130f));
-            CreateButton(panel, "NoticeButton", "Show Notice", new Vector2(0f, -130f));
-            CreateButton(panel, "OkButton", "OK", new Vector2(240f, -130f));
-            var closeButton = CreateButton(panel, "CloseButton", "X", new Vector2(340f, 170f), new Vector2(60f, 60f));
+            CreateButton(panel, "BTN_Stack", "Open Another", new Vector2(-240f, -130f));
+            CreateButton(panel, "BTN_Notice", "Show Notice", new Vector2(0f, -130f));
+            CreateButton(panel, "BTN_Ok", "OK", new Vector2(240f, -130f));
+            CreateButton(panel, "BTN_Close", "X", new Vector2(340f, 170f), new Vector2(60f, 60f));
 
-            SetReference(popup, "_panel", panel);
-            SetReference(popup, "_closeButton", closeButton);
+            UIAutoMapper.Assign(popup);
 
             return SavePrefab<PopupTest>(root.gameObject, $"{PrefabFolder}/PopupTest.prefab");
         }

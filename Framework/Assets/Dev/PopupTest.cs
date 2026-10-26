@@ -9,26 +9,37 @@ namespace Nyonyo.Dev
     /// </summary>
     public class PopupTest : PopupBase
     {
-        [SerializeField] RectTransform _panel;
+        #region Auto Generated UI
+        #pragma warning disable CS0169, CS0649
+        [SerializeField] private RectTransform RT_Panel;
+        [SerializeField] private Button BTN_Stack;
+        [SerializeField] private Button BTN_Notice;
+        [SerializeField] private Button BTN_Ok;
+        [SerializeField] private Button BTN_Close;
+        #pragma warning restore CS0169, CS0649
+        #endregion
 
         protected override void OnOpen()
         {
             var index = Manager.GetOpenPopups(Layer).Count - 1;
-            _panel.anchoredPosition += new Vector2(40f, -40f) * index;
+            RT_Panel.anchoredPosition += new Vector2(40f, -40f) * index;
         }
 
-        protected override void OnButtonEvent(Button button)
+        public override void OnButtonEvent(Button button)
         {
             switch (button.name)
             {
-                case "StackButton":
+                case "BTN_Stack":
                     PopupManager.Instance.Show<PopupTest>();
                     break;
-                case "NoticeButton":
+                case "BTN_Notice":
                     PopupManager.Instance.Show<PopupNotice>().SetMessage("Notice is drawn above every popup.");
                     break;
-                case "OkButton":
+                case "BTN_Ok":
                     Debug.Log("[Dev] PopupTest OK");
+                    Close();
+                    break;
+                case "BTN_Close":
                     Close();
                     break;
                 default:
