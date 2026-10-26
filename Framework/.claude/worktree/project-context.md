@@ -17,9 +17,15 @@
 
 - **git:** `C:\Program Files\Git\cmd\git.exe` (2.56)에 설치되어 있습니다. 전역 설정은 `pprnkr <devilplu2@gmail.com>`이고, 사용자가 직접 설정했습니다. 저장소 루트가 한 단계 위라서 `git -C ..`로 실행합니다.
   - Claude의 PowerShell에서는 PATH가 갱신되지 않을 수 있습니다. 그럴 때는 `$env:Path`를 Machine과 User 값으로 다시 읽어 옵니다.
-  - GitHub 인증(Git Credential Manager)은 로그인 창이 필요해서 Claude 터미널에서 처음 푸시할 수 없습니다. 사용자가 VS Code 터미널에서 한 번 로그인하면 이후에는 Claude도 푸시할 수 있습니다.
+  - **푸시는 사용자가 직접 합니다.** Claude 터미널에서는 GitHub 인증 창이 뜨지 않아 푸시가 실패합니다. 그래서 Claude는 커밋까지만 하고, 푸시할 커밋이 남아 있다고 알려 줍니다.
 - **Unity 검증 완료 (2026-10-26):** 컴파일 에러 없음, EditMode 테스트 16개 모두 통과, Play 모드에서 `[Nyonyo Framework]`가 DontDestroyOnLoad에 생성되는 것까지 확인했습니다.
   - 테스트 중 콘솔에 찍히는 `InvalidOperationException: dispose failed`는 `Dispose_WhenServiceThrows_ContinuesAndLogsException` 테스트가 의도한 로그입니다(`LogAssert.Expect`로 검증).
+
+## 사용 가이드
+
+- **위치:** `.claude/artifact/nyonyo-framework-guide.html`. 브라우저로 여는 단일 HTML 파일이고, 외부 의존성이 없습니다.
+- **내용:** 완료된 기능의 사용법, 예정 기능의 설계안, 규칙, 문제 해결.
+- **갱신 규칙:** 기능을 추가하거나 바꾸면 README와 함께 이 가이드도 갱신합니다. 상태 배지(검증됨, 확인 필요, 예정)도 맞춰 바꿉니다.
 
 ## 문제 해결 기록
 
@@ -63,10 +69,10 @@ Packages/com.nyonyo.framework/
 |---|---|---|
 | 0 | 패키지 구조와 asmdef | 완료, Unity 검증됨 |
 | 1 | 부트스트랩과 서비스 관리 | 완료, Unity 검증됨 |
-| 2 | 이벤트 시스템 (타입 기반 EventBus) | 완료 (Unity 검증 안 됨) |
-| 3 | 씬 관리 (비동기 로드, 로딩 화면, 페이드) | **다음 작업** |
-| 4 | UI 관리 (화면/팝업 스택, 뒤로가기) | 예정 |
-| 5 | 오디오 (BGM 크로스페이드, SFX 풀링, Mixer 볼륨) | 예정 |
+| 2 | 이벤트 시스템 (타입 기반 EventBus) | 완료, Unity 검증됨 |
+| 3 | 씬 관리 (비동기 로드, 페이드) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
+| 4 | UI 관리 (5단계 레이어, PopupManager, 뒤로가기) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
+| 5 | 오디오 (BGM 크로스페이드, SFX 풀링, Mixer 볼륨) | **다음 작업** |
 | 6 | 저장/로드 (JSON, 슬롯, 버전 마이그레이션) | 예정 |
 | 7 | 풀링, FSM, 타이머 | 예정 |
 | 8 | 디버그 도구 (로거, 치트 콘솔, 에디터 툴) | 예정 |
@@ -131,9 +137,77 @@ Packages/com.nyonyo.framework/
 - 메인 스레드 전용입니다.
 - SO 이벤트 채널과 정적 단축 API(`Events.Publish`)는 필요할 때 추가합니다.
 
+## 구현 완료: 씬 관리 (`Runtime/Scenes/`, 네임스페이스 `Nyonyo.Framework.Scenes`)
+
+| 타입 | 역할 |
+|---|---|
+| `ISceneService` / `SceneService` | `LoadAsync(sceneName)`는 `Awaitable<bool>`을 반환합니다(중복 요청이면 false). `IsLoading`, `Progress`, `MinimumLoadingSeconds`를 제공하고, `IDisposable`입니다. |
+| `ISceneTransition` / `FadeTransition` | `ShowAsync`, `SetProgress`, `HideAsync`. 페이드는 코드로 만든 UGUI Canvas를 쓰고, unscaled time으로 동작하며, 가리는 동안 UI 클릭을 막습니다. |
+| `ISceneLoader` / `SceneManagerLoader` | 실제 씬 로딩입니다. Build Profiles의 Scene List에 없는 씬이면 예외를 던집니다. Addressables 로더로 교체할 수 있습니다. |
+| `SceneLoadStarted` / `SceneLoaded` | EventBus로 발행되는 씬 전환 이벤트입니다. |
+
+결정 사항은 다음과 같습니다.
+
+**설계**
+- **진행 순서:** 시작 이벤트 → Show → Load → (최소 시간 대기) → 완료 이벤트 → Hide.
+- **의존성 주입:** 의존성은 생성자로 받습니다(transition, eventBus, loader 모두 선택). 서비스 안에서 `Services.Get`을 부르지 않습니다.
+- **정리 시 동작:** `Dispose` 시 내부 CTS를 취소해서 진행 중인 전환을 멈춥니다(게임 종료, Play 모드 종료 대응). `Application.exitCancellationToken`은 EditMode 테스트에서의 동작이 불확실해서 쓰지 않았습니다.
+- **UGUI 의존성:** Runtime asmdef가 `UnityEngine.UI`를 참조하고, package.json에 `com.unity.ugui` 2.0.0 의존성을 추가했습니다.
+
+**알려진 제약**
+- `SceneLoaded` 핸들러에서 바로 다른 씬을 로드하면 무시됩니다(아직 `IsLoading` 상태).
+- 취소해도 Unity의 씬 로드 자체는 끝까지 진행됩니다.
+
+**보류한 것**
+- Additive 씬, `SceneReference`(인스펙터 드래그), 로딩 화면 프리팹.
+
+**개발용 코드 (`Assets/Dev/`, 패키지 아님)**
+- `DevInstaller`: EventBus, SceneService 등록과 `DevSceneSwitcher` 부착.
+- `DevSceneSwitcher`: OnGUI로 빌드 씬 버튼을 띄웁니다.
+
+## 구현 완료: UI와 팝업 (`Runtime/UI/`, 네임스페이스 `Nyonyo.Framework.UI`)
+
+사용자 요구사항(2026-10-26):
+- UI 레이어는 5단계로 나눕니다. 낮은 층에 팝업이 여러 개 있어도 띠알람은 높은 층에 보여야 합니다.
+- 같은 층에서는 나중에 만든 팝업이 위에 보여야 합니다.
+- `PopupManager.Instance.Show<PopupTest>()` 형태로 띄웁니다. 싱글톤이 아니어도 됩니다.
+- `PopupBase`에 `Close`와 `ButtonEvent`를 공통 처리하는 virtual 함수를 두고, `Close` 안에서 `Destroy`합니다.
+
+| 타입 | 역할 |
+|---|---|
+| `UILayer` | `Screen`(0), `Popup`(1), `System`(2), `Notice`(3), `Top`(4). 층마다 ScreenSpaceOverlay Canvas를 두고, 정렬 순서는 1000 + 층×1000입니다. 페이드(30000)가 그 위에 그려집니다. |
+| `PopupManager` | `Show<T>(UILayer? layer)`, `Find<T>`, `IsOpen<T>`, `CloseAll(layer?)`, `HandleBack()`, `GetLayerRoot`, `GetOpenPopups`, `RegisterPrefab`, `BackKeyUnhandled` 이벤트를 제공합니다. `static Instance => Services.Get<PopupManager>()`(싱글톤 아님). |
+| `PopupBase` | virtual `OnOpen`, `OnButtonEvent(Button)`(기본은 닫기 버튼이면 Close), `Close()`(Destroy, Edit 모드에서는 DestroyImmediate). `Closed` 이벤트, `WaitUntilClosedAsync`. 직렬화 필드는 `_layer`, `_backKey`, `_closeOnSceneChange`, `_closeButton`입니다. |
+| `UISettings` (SO) | 기준 해상도(1920x1080), match 0.5, 팝업 프리팹 목록, 뒤로가기 처리 여부 |
+| `BackKeyBehavior` | `Close`, `Block`(아래 팝업도 막음), `Ignore`(건너뜀, 띠알람용) |
+| `PopupBackKeyHandler` (internal) | Update에서 ESC를 확인합니다. Input System에서는 안드로이드 뒤로가기도 ESC로 들어옵니다. |
+
+결정 사항은 다음과 같습니다.
+
+**정렬과 생명주기**
+- **같은 층 정렬:** 같은 층의 정렬은 형제 순서로 정합니다(`SetAsLastSibling`). 그래서 팝업 프리팹 루트에 Canvas를 두면 안 됩니다.
+- **버튼 연결:** 버튼은 `Open` 시점에 연결합니다. Edit 모드에서는 Awake가 호출되지 않기 때문입니다.
+- **목록 정리:** Close를 거치지 않고 Destroy된 팝업은 목록을 꺼낼 때 정리합니다(`RemoveAll(null)`).
+
+**입력과 씬 전환**
+- **EventSystem:** Play 중에 EventSystem이 없으면 `[UI]` 아래에 만들고, 씬에는 두지 않는 것을 규칙으로 합니다. Input System이 있으면 `InputSystemUIInputModule`을 씁니다.
+- **입력 심볼:** asmdef에 `Unity.InputSystem` 참조와 versionDefine `NYONYO_INPUT_SYSTEM`을 추가했고, `ENABLE_INPUT_SYSTEM`과 함께 검사합니다. 프로젝트의 입력 방식은 Input System 전용(activeInputHandler 1)입니다.
+- **씬 전환 시 닫기:** `SceneLoaded` 이벤트에서 `CloseOnSceneChange` 팝업을 닫습니다. 화면이 가려진 상태에서 닫히므로 사용자에게 보이지 않습니다.
+
+**개발용 코드 (`Assets/Dev/`)**
+- `PopupTest`: 같은 층에 쌓기, 띠알람 띄우기, OK.
+- `PopupNotice`: Notice 층, 2초 뒤 자동으로 닫힘, BackKey Ignore.
+- `DevSampleSetup`: 메뉴 Tools > Nyonyo Framework > Dev > Setup Samples. 프리팹, DevUISettings, DevInstaller, FrameworkSettings 연결, SampleScene2, Scene List를 자동으로 준비합니다.
+
+**외부 컴파일 검증**
+- Unity가 켜져 있으면 배치 모드를 쓸 수 없습니다. 그래서 scratchpad의 `compile-check.ps1`으로 Unity 내장 Roslyn(`Data/DotNetSdkRoslyn/csc.dll`)을 써서 5개 어셈블리를 컴파일합니다.
+- 참조에는 netstandard와 mscorlib shim, Managed/UnityEngine, ScriptAssemblies를 씁니다.
+- 2026-10-26 기준 에러 0, 경고 0입니다.
+
 ### 테스트 (`Tests/Editor/`)
 
-- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개(검증됨), `EventBusTests` 16개(Unity 검증 안 됨).
+- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 18개(Unity 검증 안 됨, 총 58개). `FadeTransition`과 뒤로가기 키 입력은 자동 테스트가 없습니다. 테스트용 팝업은 `Tests/Editor/TestPopups/`에 둡니다(파일 하나에 클래스 하나).
+- **SceneService 테스트 방식:** 가짜 `ISceneLoader`와 `ISceneTransition`을 넣고, 즉시 완료되는 Awaitable로 동기 검증합니다.
 - **의도된 에러 로그:** `EventBusTests`의 `handler failed` 예외 로그도 `LogAssert.Expect`로 검증하는 의도된 로그입니다.
 - **비동기 처리:** 테스트 서비스가 모두 즉시 완료되므로 `InitializeAsync().GetAwaiter()`로 동기 검증합니다. async 테스트 지원 여부에 의존하지 않으려고 이렇게 했습니다.
 - **Bootstrapper:** 자동 테스트가 없습니다. Play 모드에서 직접 확인해야 합니다.
