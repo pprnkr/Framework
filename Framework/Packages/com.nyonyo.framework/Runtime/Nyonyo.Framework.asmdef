@@ -1,7 +1,10 @@
 {
     "name": "Nyonyo.Framework",
     "rootNamespace": "Nyonyo.Framework",
-    "references": [],
+    "references": [
+        "UnityEngine.UI",
+        "Unity.InputSystem"
+    ],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
@@ -9,6 +12,12 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.inputsystem",
+            "expression": "1.0.0",
+            "define": "NYONYO_INPUT_SYSTEM"
+        }
+    ],
     "noEngineReferences": false
 }

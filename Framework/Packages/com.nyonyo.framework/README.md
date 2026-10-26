@@ -141,6 +141,139 @@ void OnDisable() => _subscription?.Dispose();
 - **중복 구독:** 같은 핸들러를 두 번 구독하면 두 번 호출됩니다. C# `event`의 `+=`와 같습니다.
 - **메모리:** 이벤트를 발행할 때 메모리를 할당하지 않습니다.
 
+## 씬 관리 (`Nyonyo.Framework.Scenes`)
+
+전환 연출과 함께 씬을 바꿉니다. 진행 순서는 다음과 같습니다.
+
+1. `SceneLoadStarted` 이벤트 발행
+2. 화면 가리기
+3. 씬 로드
+4. `SceneLoaded` 이벤트 발행
+5. 화면 보이기
+
+### 1. 등록하기
+
+```csharp
+public override void Install(ServiceRegistry services)
+{
+    var events = new EventBus();
+    services.Register<IEventBus>(events);
+
+    var transition = new FadeTransition(Bootstrapper.Root);  // 검은색, 0.3초
+    services.Register<ISceneService>(new SceneService(transition, events));
+}
+```
+
+- `SceneService` 생성자의 인자는 모두 생략할 수 있습니다.
+  - 전환 연출을 넘기지 않으면 연출 없이 바로 전환합니다.
+  - 이벤트 버스를 넘기지 않으면 이벤트를 발행하지 않습니다.
+- `MinimumLoadingSeconds`를 설정하면 로드가 빨리 끝나도 화면을 가린 상태를 그 시간만큼 유지합니다. 화면이 번쩍이는 것을 막을 때 씁니다.
+- `FadeTransition`으로 색, 시간, Canvas 정렬 순서를 바꿀 수 있습니다. 예: `new FadeTransition(Bootstrapper.Root, Color.white, 0.5f)`.
+
+### 2. 사용하기
+
+```csharp
+await Services.Get<ISceneService>().LoadAsync("Stage1");
+```
+
+- **Scene List 등록:** 씬은 **Build Profiles의 Scene List**에 추가되어 있어야 합니다. 없으면 예외가 납니다.
+- **중복 요청:** 이미 전환 중일 때 다시 요청하면 무시하고 경고를 띄우며 `false`를 반환합니다.
+- **SceneLoaded 핸들러:** `SceneLoaded` 이벤트를 받는 시점에는 아직 전환이 끝나지 않은 상태입니다. 그래서 그 핸들러 안에서 바로 다른 씬을 불러오면 무시됩니다.
+- **취소:** `CancellationToken`으로 취소하면 기다리는 것만 멈춥니다. Unity의 씬 로드 자체는 끝까지 진행됩니다.
+
+### 확장하기
+
+| 인터페이스 | 용도 |
+|---|---|
+| `ISceneTransition` | 로딩 화면 같은 다른 전환 연출을 만듭니다. `SetProgress`로 진행률(0~1)을 받습니다. |
+| `ISceneLoader` | Addressables처럼 다른 방식으로 씬을 불러옵니다. 기본은 `SceneManagerLoader`입니다. |
+
+## UI와 팝업 (`Nyonyo.Framework.UI`)
+
+UI를 5개 층(`UILayer`)으로 나눠 그립니다. 높은 층은 항상 낮은 층 위에 보이고, 같은 층에서는 나중에 띄운 팝업이 위에 보입니다. 그래서 일반 팝업이 여러 개 떠 있어도 띠알람(`Notice`)은 그 위에 나옵니다.
+
+| 층 | 용도 | Canvas 정렬 순서 |
+|---|---|---|
+| `Screen` | 메인 메뉴, HUD | 1000 |
+| `Popup` | 일반 팝업 | 2000 |
+| `System` | 확인창, 네트워크 오류 | 3000 |
+| `Notice` | 띠알람, 토스트 | 4000 |
+| `Top` | 로딩 인디케이터, 디버그 | 5000 |
+
+씬 전환 페이드(30000)는 모든 층보다 위에 그려집니다.
+
+### 1. 팝업 만들기
+
+`PopupBase`를 상속한 컴포넌트를 프리팹 루트에 붙입니다. 프리팹 루트는 Canvas가 아니라 일반 RectTransform이어야 합니다.
+
+```csharp
+public class PopupTest : PopupBase
+{
+    protected override void OnOpen() { /* 생성 직후 초기화 */ }
+
+    // 팝업 안의 모든 버튼 클릭이 여기로 모입니다.
+    protected override void OnButtonEvent(Button button)
+    {
+        switch (button.name)
+        {
+            case "OkButton": Close(); break;
+            default: base.OnButtonEvent(button); break;  // 닫기 버튼 처리
+        }
+    }
+}
+```
+
+인스펙터에서는 다음 항목을 설정합니다.
+
+| 항목 | 내용 |
+|---|---|
+| **Layer** | 기본으로 뜰 층 |
+| **Back Key** | 뒤로가기 키 동작. `Close`(닫기), `Block`(막기), `Ignore`(건너뛰기) 중에서 고릅니다. |
+| **Close On Scene Change** | 씬이 바뀔 때 자동으로 닫을지 여부 |
+| **Close Button** | 누르면 팝업을 닫는 버튼 |
+
+`Close()`는 팝업 오브젝트를 `Destroy`합니다. `Close()`를 재정의할 때는 마지막에 `base.Close()`를 호출하세요.
+
+### 2. 등록하기
+
+**Create > Nyonyo Framework > UI Settings**로 설정 에셋을 만들고, **Popup Prefabs**에 프리팹을 추가합니다. 그다음 Installer에서 등록합니다.
+
+```csharp
+[SerializeField] UISettings _uiSettings;
+
+public override void Install(ServiceRegistry services)
+{
+    var events = new EventBus();
+    services.Register<IEventBus>(events);
+    services.Register(new PopupManager(_uiSettings, Bootstrapper.Root, events));
+}
+```
+
+- **EventSystem:** Play 중에 EventSystem이 없으면 `PopupManager`가 직접 만들어서 유지합니다. 그러니 **씬에는 EventSystem을 두지 마세요.**
+- **씬 전환 시 자동 닫기:** `eventBus`를 넘기면 씬이 바뀔 때 `Close On Scene Change` 팝업을 자동으로 닫습니다.
+
+### 3. 사용하기
+
+```csharp
+// 띄우기: 프리팹에 설정된 층에 뜹니다.
+var popup = PopupManager.Instance.Show<PopupTest>();
+
+// 층 직접 지정
+PopupManager.Instance.Show<PopupTest>(UILayer.System);
+
+// 닫힐 때까지 기다리기 (확인창 응답 등)
+await popup.WaitUntilClosedAsync();
+
+// 조회와 닫기
+PopupManager.Instance.IsOpen<PopupTest>();
+PopupManager.Instance.Find<PopupTest>();       // 가장 위에 있는 인스턴스
+PopupManager.Instance.CloseAll(UILayer.Popup);  // 층을 생략하면 전부 닫기
+```
+
+- **`PopupManager.Instance`:** `Services.Get<PopupManager>()`의 줄임말입니다. 싱글톤이 아니어서 도메인 리로드를 꺼도 안전합니다.
+- **뒤로가기 키:** ESC 키와 안드로이드 뒤로가기는 가장 위 팝업부터 `Back Key` 설정대로 처리합니다. 닫을 팝업이 없으면 `BackKeyUnhandled` 이벤트가 호출됩니다. 게임 종료 확인창을 띄울 때 쓰면 됩니다.
+- **팝업이 아닌 UI:** HUD처럼 팝업이 아닌 UI를 같은 층 규칙으로 그리려면 `GetLayerRoot(UILayer.Screen)`의 자식으로 붙이세요.
+
 ## 개발
 
 이 패키지는 `Framework` Unity 프로젝트의 `Packages/` 폴더에 임베디드 패키지로 들어 있습니다. 프로젝트를 열면 바로 수정하고 테스트할 수 있습니다.

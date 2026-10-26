@@ -4,6 +4,9 @@
   "displayName": "Nyonyo Framework",
   "description": "Unity 2D 게임 개발을 위한 공용 프레임워크.",
   "unity": "6000.3",
+  "dependencies": {
+    "com.unity.ugui": "2.0.0"
+  },
   "author": {
     "name": "Nyonyo"
   },
