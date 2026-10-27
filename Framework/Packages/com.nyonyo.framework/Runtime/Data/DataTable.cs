@@ -1,90 +1,64 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
+using System.IO;
 
 namespace Nyonyo.Framework.Data
 {
     /// <summary>
-    /// 밸런스 데이터(아이템, 몬스터, 스테이지 등)를 담는 ScriptableObject 테이블입니다.
+    /// 첫 번째 열(유니크 키)로 행을 찾는 데이터 테이블입니다. 데이터 가져오기가 시트마다 상속 클래스를 만듭니다.
     /// </summary>
-    /// <remarks>
-    /// 행은 인스펙터에서 직접 편집하거나, 에셋 우클릭(⋮) 메뉴의 <b>Import CSV...</b>로 엑셀/구글 시트에서 내보낸 CSV를 가져옵니다.
-    /// 테이블 에셋은 다른 에셋처럼 Addressables나 인스펙터 참조로 불러오세요.
-    /// </remarks>
     /// <example>
     /// <code>
-    /// [Serializable]
-    /// public class ItemRow : IDataRow
-    /// {
-    ///     public string id;
-    ///     public string name;
-    ///     public int price;
-    ///     public ItemGrade grade;
-    ///     public string Id =&gt; id;
-    /// }
-    ///
-    /// [CreateAssetMenu(menuName = "MyGame/Item Table")]
-    /// public class ItemTable : DataTable&lt;ItemRow&gt; { }
-    ///
-    /// var potion = itemTable.Get("potion_small");
+    /// var sword = GameData.Instance.Item.Get(1001);
+    /// if (GameData.Instance.Item.TryGet(id, out var item)) { ... }
+    /// foreach (var monster in GameData.Instance.Monster.All) { ... }
     /// </code>
     /// </example>
-    public abstract class DataTable<TRow> : DataTableBase where TRow : IDataRow, new()
+    public abstract class DataTable<TKey, TRow> : DataTableBase where TRow : class
     {
-        [SerializeField] List<TRow> _rows = new();
+        private TRow[] _rows = Array.Empty<TRow>();
+        private Dictionary<TKey, TRow> _byKey = new();
 
-        [NonSerialized] Dictionary<string, TRow> _index;
+        public override int Count => _rows.Length;
 
-        public IReadOnlyList<TRow> Rows => _rows;
+        /// <summary>시트 순서대로 담긴 모든 행입니다.</summary>
+        public IReadOnlyList<TRow> All => _rows;
 
-        public override int Count => _rows.Count;
-
-        public override Type RowType => typeof(TRow);
-
-        /// <exception cref="KeyNotFoundException">id에 맞는 행이 없는 경우</exception>
-        public TRow Get(string id)
+        /// <exception cref="KeyNotFoundException">키에 맞는 행이 없는 경우</exception>
+        public TRow Get(TKey key)
         {
-            if (TryGet(id, out var row))
+            if (_byKey.TryGetValue(key, out var row))
                 return row;
 
-            throw new KeyNotFoundException($"{name} 테이블에 id '{id}' 행이 없습니다.");
+            if (!IsLoaded)
+                throw new InvalidOperationException($"{Name} 테이블을 아직 불러오지 않았습니다. GameData를 서비스로 등록했는지 확인하세요.");
+            throw new KeyNotFoundException($"{Name} 테이블에 키 '{key}'가 없습니다.");
         }
 
-        public bool TryGet(string id, out TRow row)
+        public bool TryGet(TKey key, out TRow row) => _byKey.TryGetValue(key, out row);
+
+        public bool Contains(TKey key) => _byKey.ContainsKey(key);
+
+        /// <summary>행 하나를 읽습니다. 자동 생성 코드가 구현합니다.</summary>
+        protected abstract TRow ReadRow(GameDataReader reader);
+
+        /// <summary>행의 키(첫 번째 열)입니다. 자동 생성 코드가 구현합니다.</summary>
+        protected abstract TKey GetKey(TRow row);
+
+        private protected sealed override void LoadRows(GameDataReader reader, int count)
         {
-            EnsureIndex();
-            if (id != null)
-                return _index.TryGetValue(id, out row);
-
-            row = default;
-            return false;
-        }
-
-        public bool Contains(string id) => TryGet(id, out _);
-
-        internal override void ImportCsv(string csv)
-        {
-            _rows = CsvRowMapper.Map<TRow>(csv);
-            _index = null;
-        }
-
-        protected virtual void OnValidate() => _index = null;
-
-        void EnsureIndex()
-        {
-            if (_index != null)
-                return;
-
-            _index = new Dictionary<string, TRow>();
-            foreach (var row in _rows)
+            var rows = new TRow[count];
+            var byKey = new Dictionary<TKey, TRow>(count);
+            for (var i = 0; i < count; i++)
             {
-                var id = row?.Id;
-                if (string.IsNullOrEmpty(id))
-                    continue;
-
-                if (!_index.TryAdd(id, row))
-                    Debug.LogWarning($"[Nyonyo Framework] {name} 테이블에 id '{id}'가 두 번 있습니다. 첫 번째 행만 씁니다.", this);
+                var row = ReadRow(reader);
+                if (!byKey.TryAdd(GetKey(row), row))
+                    throw new InvalidDataException($"{Name}: 키 '{GetKey(row)}'가 두 번 있습니다. 데이터를 다시 가져오세요.");
+                rows[i] = row;
             }
+
+            _rows = rows;
+            _byKey = byKey;
         }
     }
 }
