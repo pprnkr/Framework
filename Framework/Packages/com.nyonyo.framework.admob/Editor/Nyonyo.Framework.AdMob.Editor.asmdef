@@ -1,0 +1,20 @@
+{
+    "name": "Nyonyo.Framework.AdMob.Editor",
+    "rootNamespace": "Nyonyo.Framework.Ads.AdMob.Editor",
+    "references": [
+        "Nyonyo.Framework",
+        "Nyonyo.Framework.Editor",
+        "Nyonyo.Framework.AdMob"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

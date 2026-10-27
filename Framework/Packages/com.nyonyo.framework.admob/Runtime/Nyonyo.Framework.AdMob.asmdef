@@ -1,0 +1,16 @@
+{
+    "name": "Nyonyo.Framework.AdMob",
+    "rootNamespace": "Nyonyo.Framework.Ads.AdMob",
+    "references": [
+        "Nyonyo.Framework"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

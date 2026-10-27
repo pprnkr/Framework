@@ -1,0 +1,19 @@
+{
+  "name": "com.nyonyo.framework.admob",
+  "version": "0.1.0",
+  "displayName": "Nyonyo Framework - AdMob",
+  "description": "Nyonyo Framework의 광고 서비스(IAdService)를 Google AdMob으로 구현합니다. 배너, 전면, 보상형, 앱 오프닝 광고와 UMP 동의(GDPR)를 지원합니다.",
+  "unity": "6000.3",
+  "dependencies": {
+    "com.nyonyo.framework": "0.1.0",
+    "com.google.ads.mobile": "11.6.0"
+  },
+  "author": {
+    "name": "Nyonyo"
+  },
+  "keywords": [
+    "framework",
+    "ads",
+    "admob"
+  ]
+}
