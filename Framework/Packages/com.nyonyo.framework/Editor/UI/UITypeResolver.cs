@@ -10,7 +10,7 @@ namespace Nyonyo.Framework.Editor.UI
     /// </summary>
     static class UITypeResolver
     {
-        static readonly Dictionary<string, Type> s_cache = new();
+        private static readonly Dictionary<string, Type> s_cache = new();
 
         public static Type Resolve(string typeName)
         {

@@ -9,6 +9,6 @@ namespace Nyonyo.Framework.Timing
     {
         internal TimerService Service;
 
-        void Update() => Service?.Tick(Time.deltaTime, Time.unscaledDeltaTime);
+        private void Update() => Service?.Tick(Time.deltaTime, Time.unscaledDeltaTime);
     }
 }

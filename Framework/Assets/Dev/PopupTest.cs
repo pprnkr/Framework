@@ -1,5 +1,4 @@
 using Nyonyo.Framework.Assets;
-using Nyonyo.Framework.Audio;
 using Nyonyo.Framework.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -22,34 +21,34 @@ namespace Nyonyo.Dev
         #pragma warning restore CS0169, CS0649
         #endregion
 
-        protected override void OnOpen()
+        protected override void PostOpen()
         {
             var index = Manager.GetOpenPopups(Layer).Count - 1;
             RT_Panel.anchoredPosition += new Vector2(40f, -40f) * index;
         }
 
-        public override void OnButtonEvent(Button button)
+        protected override void OnButtonClick(Button button)
         {
-            _ = SoundManager.Instance.PlaySFX("Click");
-
-            switch (button.name)
+            if (button == BTN_Stack)
             {
-                case "BTN_Stack":
-                    PopupManager.Instance.Show<PopupTest>();
-                    break;
-                case "BTN_Notice":
-                    PopupManager.Instance.Show<PopupNotice>().SetMessage("Notice is drawn above every popup.");
-                    break;
-                case "BTN_Ok":
-                    Debug.Log("[Dev] PopupTest OK");
-                    Close();
-                    break;
-                case "BTN_Close":
-                    Close();
-                    break;
-                default:
-                    base.OnButtonEvent(button);
-                    break;
+                PopupManager.Instance.Open<PopupTest>().OnClosed(() => Debug.Log("[Dev] Stacked PopupTest closed"));
+            }
+            else if (button == BTN_Notice)
+            {
+                PopupManager.Instance.Open<PopupNotice>().SetMessage("Notice is drawn above every popup.");
+            }
+            else if (button == BTN_Ok)
+            {
+                Debug.Log("[Dev] PopupTest OK");
+                Close();
+            }
+            else if (button == BTN_Close)
+            {
+                Close();
+            }
+            else
+            {
+                base.OnButtonClick(button);
             }
         }
     }

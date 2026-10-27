@@ -10,14 +10,14 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class ServiceRegistryTests
     {
-        interface IServiceA { }
-        interface IServiceB { }
-        interface IServiceC { }
+        private interface IServiceA { }
+        private interface IServiceB { }
+        private interface IServiceC { }
 
-        class TestService : IServiceA, IServiceB, IServiceC, IInitializable, IDisposable
+        private class TestService : IServiceA, IServiceB, IServiceC, IInitializable, IDisposable
         {
-            readonly string _name;
-            readonly List<string> _log;
+            private readonly string _name;
+            private readonly List<string> _log;
 
             public bool ThrowOnInitialize;
             public bool ThrowOnDispose;
@@ -43,10 +43,10 @@ namespace Nyonyo.Framework.Editor.Tests
             }
         }
 
-        class AsyncTestService : IServiceA, IServiceB, IServiceC, IAsyncInitializable, IDisposable
+        private class AsyncTestService : IServiceA, IServiceB, IServiceC, IAsyncInitializable, IDisposable
         {
-            readonly string _name;
-            readonly List<string> _log;
+            private readonly string _name;
+            private readonly List<string> _log;
 
             public AsyncTestService(string name, List<string> log)
             {
@@ -65,8 +65,8 @@ namespace Nyonyo.Framework.Editor.Tests
             public void Dispose() => _log.Add($"dispose:{_name}");
         }
 
-        List<string> _log;
-        ServiceRegistry _registry;
+        private List<string> _log;
+        private ServiceRegistry _registry;
 
         [SetUp]
         public void SetUp()
@@ -79,7 +79,7 @@ namespace Nyonyo.Framework.Editor.Tests
         public void TearDown() => _registry.Dispose();
 
         // 테스트 서비스는 모두 즉시 완료되므로 InitializeAsync도 동기적으로 끝납니다.
-        void InitializeNow()
+        private void InitializeNow()
         {
             var awaiter = _registry.InitializeAsync().GetAwaiter();
             Assert.IsTrue(awaiter.IsCompleted, "InitializeAsync가 동기적으로 완료되지 않았습니다.");

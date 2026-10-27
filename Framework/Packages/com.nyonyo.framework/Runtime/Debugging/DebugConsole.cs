@@ -32,9 +32,9 @@ namespace Nyonyo.Framework.Debugging
             public LogType Type { get; }
         }
 
-        readonly List<Line> _lines = new();
-        readonly int _maxLines;
-        readonly GameObject _viewObject;
+        private readonly List<Line> _lines = new();
+        private readonly int _maxLines;
+        private readonly GameObject _viewObject;
 
         /// <summary>
         /// 서비스로 등록된 DebugConsole입니다. <c>Services.Get&lt;DebugConsole&gt;()</c>와 같습니다.
@@ -74,6 +74,11 @@ namespace Nyonyo.Framework.Debugging
 
         /// <summary>콘솔을 여닫는 키입니다. 기본값은 백쿼트(`)입니다.</summary>
         public KeyCode ToggleKey { get; set; } = KeyCode.BackQuote;
+
+        /// <summary>
+        /// 키보드가 없는 모바일에서 콘솔을 여닫는 손가락 수입니다. 이 수만큼 동시에 화면을 탭하면 여닫힙니다. 기본값은 3이고, 0이면 끕니다.
+        /// </summary>
+        public int ToggleTouchCount { get; set; } = 3;
 
         internal IReadOnlyList<Line> Lines => _lines;
 
@@ -120,7 +125,7 @@ namespace Nyonyo.Framework.Debugging
             IsOpen = false;
         }
 
-        void OnLogMessage(string message, string stackTrace, LogType type)
+        private void OnLogMessage(string message, string stackTrace, LogType type)
         {
             var text = type == LogType.Exception || type == LogType.Error || type == LogType.Assert
                 ? $"{message}\n{FirstLines(stackTrace, 3)}"
@@ -128,7 +133,7 @@ namespace Nyonyo.Framework.Debugging
             AddLine(text, type);
         }
 
-        void AddLine(string text, LogType type)
+        private void AddLine(string text, LogType type)
         {
             _lines.Add(new Line(text, type));
             if (_lines.Count > _maxLines)
@@ -136,7 +141,7 @@ namespace Nyonyo.Framework.Debugging
             Version++;
         }
 
-        void RegisterBuiltInCommands()
+        private void RegisterBuiltInCommands()
         {
             Commands.Register("clear", "콘솔을 비웁니다.", _ => Clear());
             Commands.Register("timescale", "게임 속도를 바꿉니다. 예: timescale 0.5", args =>
@@ -158,12 +163,12 @@ namespace Nyonyo.Framework.Debugging
                 if (!Services.TryGet(out ISceneService scenes))
                     return "ISceneService가 등록되지 않았습니다.";
 
-                _ = scenes.LoadAsync(args[0]);
+                scenes.Load(args[0]);
                 return $"{args[0]} 씬을 불러옵니다.";
             }, "scene <name:string>");
         }
 
-        static string FirstLines(string text, int count)
+        private string FirstLines(string text, int count)
         {
             if (string.IsNullOrEmpty(text))
                 return "";

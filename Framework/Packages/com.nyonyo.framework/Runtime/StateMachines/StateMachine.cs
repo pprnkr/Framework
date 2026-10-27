@@ -25,19 +25,19 @@ namespace Nyonyo.Framework.StateMachines
     /// </example>
     public sealed class StateMachine<TState>
     {
-        sealed class StateCallbacks
+        private sealed class StateCallbacks
         {
             public Action Enter;
             public Action<float> Update;
             public Action Exit;
         }
 
-        readonly Dictionary<TState, StateCallbacks> _states = new();
-        readonly Queue<TState> _pending = new();
-        readonly EqualityComparer<TState> _comparer = EqualityComparer<TState>.Default;
-        StateCallbacks _current;
-        bool _changing;
-        TState _lastRequested;
+        private readonly Dictionary<TState, StateCallbacks> _states = new();
+        private readonly Queue<TState> _pending = new();
+        private readonly EqualityComparer<TState> _comparer = EqualityComparer<TState>.Default;
+        private StateCallbacks _current;
+        private bool _changing;
+        private TState _lastRequested;
 
         public TState CurrentState { get; private set; }
 
@@ -122,7 +122,7 @@ namespace Nyonyo.Framework.StateMachines
             _current.Update?.Invoke(deltaTime);
         }
 
-        void Transition(TState next)
+        private void Transition(TState next)
         {
             var hadState = HasState;
             var previous = CurrentState;

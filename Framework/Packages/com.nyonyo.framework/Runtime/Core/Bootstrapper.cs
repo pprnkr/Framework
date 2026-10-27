@@ -20,11 +20,13 @@ namespace Nyonyo.Framework
     /// 모든 서비스가 동기적으로 초기화되면 첫 씬의 <c>Awake</c>보다 먼저 준비가 끝납니다.
     /// 비동기 초기화가 있는 경우에는 <see cref="WaitUntilReadyAsync"/>로 준비될 때까지 기다리세요.
     /// </remarks>
+    // RuntimeInitializeOnLoadMethod는 static 함수만 호출하므로 static 클래스입니다.
+    // 게임 전체에서 하나뿐인 부트스트랩 상태(State, Root)를 들고 있는 것은 의도된 전역 상태입니다.
     public static class Bootstrapper
     {
         public const string SettingsResourcePath = "NyonyoFrameworkSettings";
 
-        static ServiceRegistry s_registry;
+        private static ServiceRegistry s_registry;
 
         public static BootstrapState State { get; private set; }
 
@@ -51,7 +53,7 @@ namespace Nyonyo.Framework
 
         // Domain Reload를 끈 상태에서도 이전 Play의 정적 상태가 남지 않도록 초기화합니다.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics()
+        private static void ResetStatics()
         {
             Application.quitting -= Shutdown;
             s_registry = null;
@@ -61,9 +63,9 @@ namespace Nyonyo.Framework
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        static void AutoRun() => _ = RunAsync();
+        private static void AutoRun() => RunAsync().Forget();
 
-        static async Awaitable RunAsync()
+        private static async Awaitable RunAsync()
         {
             State = BootstrapState.Initializing;
 
@@ -93,14 +95,14 @@ namespace Nyonyo.Framework
             }
         }
 
-        static void Install(ServiceRegistry registry)
+        private static void Install(ServiceRegistry registry)
         {
             var settings = Resources.Load<FrameworkSettings>(SettingsResourcePath);
             if (settings == null)
             {
                 Debug.LogWarning(
                     $"[Nyonyo Framework] Resources/{SettingsResourcePath} 설정 파일이 없어서 서비스 없이 시작합니다. " +
-                    "메뉴 Tools > Nyonyo Framework > Create Settings로 만들 수 있습니다.");
+                    "메뉴 Tools > Nyonyo Framework > Settings > Framework Settings로 만들 수 있습니다.");
                 return;
             }
 
@@ -116,7 +118,7 @@ namespace Nyonyo.Framework
             }
         }
 
-        static void Shutdown()
+        private static void Shutdown()
         {
             Application.quitting -= Shutdown;
             s_registry?.Dispose();

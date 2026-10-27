@@ -12,12 +12,12 @@ namespace Nyonyo.Dev
     [Popup(Path = "Assets/Dev/Prefabs/PopupNotice.prefab", LoadType = LoadType.Addressables, Preload = true)]
     public class PopupNotice : PopupBase
     {
-        [SerializeField] Text _message;
-        [SerializeField] float _duration = 2f;
+        [SerializeField] private Text _message;
+        [SerializeField] private float _duration = 2f;
 
         public void SetMessage(string message) => _message.text = message;
 
-        protected override async void OnOpen()
+        protected override async void PostOpen()
         {
             try
             {

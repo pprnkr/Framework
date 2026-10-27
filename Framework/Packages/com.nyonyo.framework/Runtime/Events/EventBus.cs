@@ -14,18 +14,18 @@ namespace Nyonyo.Framework.Events
     /// </remarks>
     public sealed class EventBus : IEventBus, IDisposable
     {
-        interface IChannel
+        private interface IChannel
         {
             void Clear();
         }
 
-        sealed class Channel<TEvent> : IChannel
+        private sealed class Channel<TEvent> : IChannel
         {
-            static readonly Predicate<Action<TEvent>> s_isRemoved = handler => handler == null;
+            private static readonly Predicate<Action<TEvent>> s_isRemoved = handler => handler == null;
 
-            readonly List<Action<TEvent>> _handlers = new();
-            int _publishDepth;
-            bool _hasRemovals;
+            private readonly List<Action<TEvent>> _handlers = new();
+            private int _publishDepth;
+            private bool _hasRemovals;
 
             public void Add(Action<TEvent> handler) => _handlers.Add(handler);
 
@@ -82,7 +82,7 @@ namespace Nyonyo.Framework.Events
             }
 
             // 발행 도중에는 리스트 순서가 바뀌지 않도록 자리만 비워 두고, 발행이 끝난 뒤에 정리합니다.
-            void RemoveAt(int index)
+            private void RemoveAt(int index)
             {
                 if (_publishDepth > 0)
                 {
@@ -96,10 +96,10 @@ namespace Nyonyo.Framework.Events
             }
         }
 
-        sealed class Subscription<TEvent> : IDisposable where TEvent : struct, IEvent
+        private sealed class Subscription<TEvent> : IDisposable where TEvent : struct, IEvent
         {
-            IEventBus _bus;
-            readonly Action<TEvent> _handler;
+            private IEventBus _bus;
+            private readonly Action<TEvent> _handler;
 
             public Subscription(IEventBus bus, Action<TEvent> handler)
             {
@@ -114,7 +114,7 @@ namespace Nyonyo.Framework.Events
             }
         }
 
-        readonly Dictionary<Type, IChannel> _channels = new();
+        private readonly Dictionary<Type, IChannel> _channels = new();
 
         public IDisposable Subscribe<TEvent>(Action<TEvent> handler) where TEvent : struct, IEvent
         {

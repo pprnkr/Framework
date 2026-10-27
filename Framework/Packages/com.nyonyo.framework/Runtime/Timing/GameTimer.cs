@@ -8,8 +8,8 @@ namespace Nyonyo.Framework.Timing
     /// </summary>
     public sealed class GameTimer
     {
-        readonly Object _owner;
-        readonly bool _hasOwner;
+        private readonly Object _owner;
+        private readonly bool _hasOwner;
 
         internal GameTimer(float interval, Action callback, bool unscaledTime, int repeatCount, Object owner)
         {

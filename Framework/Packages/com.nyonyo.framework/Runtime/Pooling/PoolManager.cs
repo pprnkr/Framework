@@ -13,14 +13,14 @@ namespace Nyonyo.Framework.Pooling
     /// <code>
     /// var bullet = PoolManager.Instance.Spawn(bulletPrefab, muzzle.position, muzzle.rotation);
     /// PoolManager.Instance.Despawn(bullet);            // 바로 돌려놓기
-    /// _ = PoolManager.Instance.DespawnAfter(effect, 1f); // 1초 뒤 돌려놓기
+    /// PoolManager.Instance.DespawnAfter(effect, 1f);   // 1초 뒤 돌려놓기
     /// </code>
     /// </example>
     public sealed class PoolManager : IDisposable
     {
-        readonly Dictionary<GameObject, PrefabPool> _pools = new();
-        readonly GameObject _root;
-        readonly int _defaultMaxInactive;
+        private readonly Dictionary<GameObject, PrefabPool> _pools = new();
+        private readonly GameObject _root;
+        private readonly int _defaultMaxInactive;
 
         /// <summary>
         /// 서비스로 등록된 PoolManager입니다. <c>Services.Get&lt;PoolManager&gt;()</c>와 같습니다.
@@ -67,8 +67,15 @@ namespace Nyonyo.Framework.Pooling
 
         /// <summary>
         /// <paramref name="seconds"/>초 뒤에 인스턴스를 풀에 돌려놓습니다. 그 전에 다른 곳에서 돌려놓았으면 아무 일도 하지 않습니다.
+        /// 기다리는 일은 내부에서 진행됩니다.
         /// </summary>
-        public async Awaitable DespawnAfter(GameObject instance, float seconds, bool unscaledTime = false,
+        public void DespawnAfter(GameObject instance, float seconds, bool unscaledTime = false) =>
+            DespawnAfterAsync(instance, seconds, unscaledTime).Forget();
+
+        /// <summary>
+        /// <see cref="DespawnAfter"/>와 같고, 돌려놓을 때까지 기다리거나 취소할 수 있습니다.
+        /// </summary>
+        public async Awaitable DespawnAfterAsync(GameObject instance, float seconds, bool unscaledTime = false,
             CancellationToken cancellationToken = default)
         {
             var pooled = instance != null ? instance.GetComponent<PooledObject>() : null;

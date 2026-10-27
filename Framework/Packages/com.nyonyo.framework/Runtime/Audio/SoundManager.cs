@@ -24,9 +24,9 @@ namespace Nyonyo.Framework.Audio
         public const string VolumeSaveKey = "sound.volume";
 
         // 슬라이더를 움직이는 동안 매번 저장하지 않도록, 마지막 변경 뒤 이 시간(실시간 초)이 지나면 저장합니다.
-        const double VolumeSaveDelay = 0.5;
+        private const double VolumeSaveDelay = 0.5;
 
-        sealed class BgmChannel
+        private sealed class BgmChannel
         {
             public AudioSource Source;
             public string Name;
@@ -35,7 +35,7 @@ namespace Nyonyo.Framework.Audio
             public float Fade;
         }
 
-        sealed class SfxChannel
+        private sealed class SfxChannel
         {
             public AudioSource Source;
             public string Name;
@@ -44,24 +44,24 @@ namespace Nyonyo.Framework.Audio
             public double EndTime;
         }
 
-        readonly IAssetLoader _loader;
-        readonly bool _ownsLoader;
-        readonly LoadType _loadType;
-        readonly string _bgmPathFormat;
-        readonly string _sfxPathFormat;
-        readonly GameObject _root;
-        readonly BgmChannel[] _bgm = new BgmChannel[2];
-        readonly SfxChannel[] _sfx;
-        readonly Dictionary<string, AudioClip> _sfxClips = new();
-        readonly CancellationTokenSource _disposeCts = new();
-        readonly SaveService _save;
-        CancellationTokenSource _bgmCts;
-        int _activeBgm;
-        int _volumeSaveRequest;
-        bool _volumeDirty;
-        float _masterVolume = 1f;
-        float _bgmVolume = 1f;
-        float _sfxVolume = 1f;
+        private readonly IAssetLoader _loader;
+        private readonly bool _ownsLoader;
+        private readonly LoadType _loadType;
+        private readonly string _bgmPathFormat;
+        private readonly string _sfxPathFormat;
+        private readonly GameObject _root;
+        private readonly BgmChannel[] _bgm = new BgmChannel[2];
+        private readonly SfxChannel[] _sfx;
+        private readonly Dictionary<string, AudioClip> _sfxClips = new();
+        private readonly CancellationTokenSource _disposeCts = new();
+        private readonly SaveService _save;
+        private CancellationTokenSource _bgmCts;
+        private int _activeBgm;
+        private int _volumeSaveRequest;
+        private bool _volumeDirty;
+        private float _masterVolume = 1f;
+        private float _bgmVolume = 1f;
+        private float _sfxVolume = 1f;
 
         /// <summary>
         /// 서비스로 등록된 SoundManager입니다. <c>Services.Get&lt;SoundManager&gt;()</c>와 같습니다.
@@ -96,6 +96,10 @@ namespace Nyonyo.Framework.Audio
                 _sfx[i] = new SfxChannel { Source = CreateSource($"SFX {i}") };
 
             LoadVolumes();
+
+            // Android, iOS, WebGL은 종료 이벤트 없이 앱이 내려가거나 탭이 닫힐 수 있습니다.
+            // 그래서 포커스를 잃는 순간(백그라운드 전환, 탭 전환) 저장하지 않은 볼륨을 바로 저장합니다.
+            Application.focusChanged += OnFocusChanged;
         }
 
         /// <summary>
@@ -132,12 +136,19 @@ namespace Nyonyo.Framework.Audio
 
         /// <summary>
         /// BGM을 재생합니다. 같은 BGM이 이미 재생 중이면 진행 중인 페이드를 멈추고 볼륨만 바꿉니다.
+        /// 불러오기와 크로스페이드는 내부에서 진행되므로 기다릴 필요가 없습니다. 끝날 때까지 기다려야 하면 <see cref="PlayBGMAsync"/>를 쓰세요.
         /// </summary>
         /// <param name="name">사운드 이름입니다. 경로는 BGM 경로 형식(기본 BGM/{0})으로 만듭니다.</param>
         /// <param name="volume">이 BGM의 볼륨(0~1)입니다.</param>
         /// <param name="fadeSeconds">0보다 크면 이전 BGM과 이 시간 동안 크로스페이드합니다.</param>
         /// <param name="loop">반복 재생 여부입니다.</param>
-        public async Awaitable PlayBGM(string name, float volume = 1f, float fadeSeconds = 0f, bool loop = true)
+        public void PlayBGM(string name, float volume = 1f, float fadeSeconds = 0f, bool loop = true)
+            => PlayBGMAsync(name, volume, fadeSeconds, loop).Forget();
+
+        /// <summary>
+        /// <see cref="PlayBGM"/>과 같고, 불러오기와 크로스페이드가 끝날 때까지 기다릴 수 있습니다.
+        /// </summary>
+        public async Awaitable PlayBGMAsync(string name, float volume = 1f, float fadeSeconds = 0f, bool loop = true)
         {
             if (string.IsNullOrEmpty(name))
             {
@@ -206,10 +217,15 @@ namespace Nyonyo.Framework.Audio
         }
 
         /// <summary>
-        /// BGM을 멈추고 메모리에서 내립니다.
+        /// BGM을 멈추고 메모리에서 내립니다. 페이드아웃은 내부에서 진행됩니다.
         /// </summary>
         /// <param name="fadeSeconds">0보다 크면 이 시간 동안 소리를 줄인 뒤 멈춥니다.</param>
-        public async Awaitable StopBGM(float fadeSeconds = 0f)
+        public void StopBGM(float fadeSeconds = 0f) => StopBGMAsync(fadeSeconds).Forget();
+
+        /// <summary>
+        /// <see cref="StopBGM"/>과 같고, 페이드아웃이 끝날 때까지 기다릴 수 있습니다.
+        /// </summary>
+        public async Awaitable StopBGMAsync(float fadeSeconds = 0f)
         {
             var token = RestartBgmToken();
             StopChannel(_bgm[1 - _activeBgm]);
@@ -240,11 +256,16 @@ namespace Nyonyo.Framework.Audio
         }
 
         /// <summary>
-        /// 효과음을 재생합니다. 처음 재생하는 효과음은 불러온 뒤에 재생합니다.
+        /// 효과음을 재생합니다. 이미 불러온 효과음은 바로 재생하고, 처음 재생하는 효과음은 내부에서 불러온 뒤에 재생합니다.
         /// </summary>
         /// <param name="name">사운드 이름입니다. 경로는 효과음 경로 형식(기본 SFX/{0})으로 만듭니다.</param>
         /// <param name="volume">이 효과음의 볼륨(0~1)입니다.</param>
-        public async Awaitable PlaySFX(string name, float volume = 1f)
+        public void PlaySFX(string name, float volume = 1f) => PlaySFXAsync(name, volume).Forget();
+
+        /// <summary>
+        /// <see cref="PlaySFX"/>와 같고, 불러와서 재생을 시작할 때까지 기다릴 수 있습니다.
+        /// </summary>
+        public async Awaitable PlaySFXAsync(string name, float volume = 1f)
         {
             if (string.IsNullOrEmpty(name))
             {
@@ -275,7 +296,7 @@ namespace Nyonyo.Framework.Audio
         /// <summary>
         /// 효과음을 미리 불러 둡니다. 처음 재생할 때 생기는 지연을 없앨 때 씁니다.
         /// </summary>
-        public async Awaitable PreloadSFX(params string[] names)
+        public async Awaitable PreloadSFXAsync(params string[] names)
         {
             foreach (var name in names)
             {
@@ -350,6 +371,7 @@ namespace Nyonyo.Framework.Audio
         /// </summary>
         public void Dispose()
         {
+            Application.focusChanged -= OnFocusChanged;
             if (_volumeDirty)
                 SaveVolumes();
 
@@ -365,9 +387,15 @@ namespace Nyonyo.Framework.Audio
 
         internal AudioSource GetSfxSource(int index) => _sfx[index].Source;
 
+        internal void OnFocusChanged(bool hasFocus)
+        {
+            if (!hasFocus && _volumeDirty)
+                SaveVolumes();
+        }
+
         internal AudioSource ActiveBgmSource => _bgm[_activeBgm].Source;
 
-        async Awaitable<AudioClip> LoadSfxAsync(string name)
+        private async Awaitable<AudioClip> LoadSfxAsync(string name)
         {
             var path = string.Format(_sfxPathFormat, name);
             var clip = await _loader.LoadAsync<AudioClip>(path, _loadType, _disposeCts.Token);
@@ -383,7 +411,7 @@ namespace Nyonyo.Framework.Audio
             return clip;
         }
 
-        void PlayOnChannel(string name, AudioClip clip, float volume)
+        private void PlayOnChannel(string name, AudioClip clip, float volume)
         {
             var now = Time.realtimeSinceStartupAsDouble;
             var channel = FindChannel(now);
@@ -399,7 +427,7 @@ namespace Nyonyo.Framework.Audio
         }
 
         // 비어 있는 채널을 고르고, 다 차 있으면 가장 먼저 시작한 효과음의 채널을 씁니다.
-        SfxChannel FindChannel(double now)
+        private SfxChannel FindChannel(double now)
         {
             SfxChannel oldest = _sfx[0];
             foreach (var channel in _sfx)
@@ -414,7 +442,7 @@ namespace Nyonyo.Framework.Audio
             return oldest;
         }
 
-        async Awaitable CrossFadeAsync(BgmChannel from, BgmChannel to, float seconds, CancellationToken token)
+        private async Awaitable CrossFadeAsync(BgmChannel from, BgmChannel to, float seconds, CancellationToken token)
         {
             var fromStart = from.Fade;
             try
@@ -441,14 +469,14 @@ namespace Nyonyo.Framework.Audio
 
         // 진행 중인 BGM 로드나 페이드를 취소하고 새 토큰을 만듭니다.
         // 이전 토큰을 아직 기다리는 쪽이 있을 수 있어서 Dispose하지 않습니다.
-        CancellationToken RestartBgmToken()
+        private CancellationToken RestartBgmToken()
         {
             _bgmCts?.Cancel();
             _bgmCts = CancellationTokenSource.CreateLinkedTokenSource(_disposeCts.Token);
             return _bgmCts.Token;
         }
 
-        void StopChannel(BgmChannel channel)
+        private void StopChannel(BgmChannel channel)
         {
             channel.Source.Stop();
             channel.Source.clip = null;
@@ -460,7 +488,7 @@ namespace Nyonyo.Framework.Audio
             channel.Fade = 0f;
         }
 
-        static void StopChannel(SfxChannel channel)
+        private void StopChannel(SfxChannel channel)
         {
             channel.Source.Stop();
             channel.Source.clip = null;
@@ -468,7 +496,7 @@ namespace Nyonyo.Framework.Audio
             channel.EndTime = 0d;
         }
 
-        void SetVolume(ref float field, float value)
+        private void SetVolume(ref float field, float value)
         {
             value = Mathf.Clamp01(value);
             if (Mathf.Approximately(field, value))
@@ -480,7 +508,7 @@ namespace Nyonyo.Framework.Audio
             ScheduleVolumeSave();
         }
 
-        void LoadVolumes()
+        private void LoadVolumes()
         {
             if (_save == null || !_save.TryLoad(VolumeSaveKey, out SoundVolumeData data, SaveScope.Global))
                 return;
@@ -491,17 +519,17 @@ namespace Nyonyo.Framework.Audio
             ApplyVolumes();
         }
 
-        void ScheduleVolumeSave()
+        private void ScheduleVolumeSave()
         {
             if (_save == null)
                 return;
 
             _volumeDirty = true;
-            _ = SaveVolumesLaterAsync(++_volumeSaveRequest);
+            SaveVolumesLaterAsync(++_volumeSaveRequest).Forget();
         }
 
         // 일시정지(timeScale 0) 중에도 저장되도록 실시간으로 기다립니다.
-        async Awaitable SaveVolumesLaterAsync(int request)
+        private async Awaitable SaveVolumesLaterAsync(int request)
         {
             var due = Time.realtimeSinceStartupAsDouble + VolumeSaveDelay;
             try
@@ -518,7 +546,7 @@ namespace Nyonyo.Framework.Audio
                 SaveVolumes();
         }
 
-        void ApplyVolumes()
+        private void ApplyVolumes()
         {
             foreach (var channel in _bgm)
                 channel.Source.volume = _masterVolume * _bgmVolume * channel.Volume * channel.Fade;
@@ -527,7 +555,7 @@ namespace Nyonyo.Framework.Audio
                 channel.Source.volume = _masterVolume * _sfxVolume * channel.Volume;
         }
 
-        AudioSource CreateSource(string name)
+        private AudioSource CreateSource(string name)
         {
             var go = new GameObject(name);
             go.transform.SetParent(_root.transform, false);

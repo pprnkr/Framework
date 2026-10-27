@@ -40,7 +40,7 @@ namespace Nyonyo.Framework.Editor.UI
                 MessageType.None);
         }
 
-        static void DrawPopupPathCheck(UIBase popup)
+        private void DrawPopupPathCheck(UIBase popup)
         {
             var info = popup.GetType().GetCustomAttribute<PopupAttribute>();
             if (info == null || string.IsNullOrEmpty(info.Path))

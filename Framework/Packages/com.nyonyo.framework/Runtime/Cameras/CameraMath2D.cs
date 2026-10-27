@@ -37,7 +37,7 @@ namespace Nyonyo.Framework.Cameras
                 cameraCenter.y + Mathf.Sign(delta.y) * Mathf.Max(0f, Mathf.Abs(delta.y) - half.y));
         }
 
-        static float ClampAxis(float value, float halfExtent, float min, float max)
+        private static float ClampAxis(float value, float halfExtent, float min, float max)
         {
             if (max - min <= halfExtent * 2f)
                 return (min + max) * 0.5f;

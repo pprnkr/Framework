@@ -16,16 +16,16 @@ namespace Nyonyo.Framework.Editor.Tests
     public static class TestDebugCommands
     {
         [DebugCommand("test.add", "두 수를 더합니다")]
-        static int Add(int a, int b = 10) => a + b;
+        private static int Add(int a, int b = 10) => a + b;
 
         [DebugCommand("test.echo")]
-        static string Echo(string[] args) => string.Join("|", args);
+        private static string Echo(string[] args) => string.Join("|", args);
 
         [DebugCommand("test.mode")]
-        static string Mode(TestDifficulty difficulty, bool cheats) => $"{difficulty}:{cheats}";
+        private static string Mode(TestDifficulty difficulty, bool cheats) => $"{difficulty}:{cheats}";
 
         [DebugCommand("test.fail")]
-        static void Fail() => throw new System.InvalidOperationException("boom");
+        private static void Fail() => throw new System.InvalidOperationException("boom");
     }
 
     public class DebuggingTests
@@ -60,9 +60,9 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void Tokenize_SplitsBySpaceAndKeepsQuotedText()
         {
-            CollectionAssert.AreEqual(new[] { "say", "hello world", "x" }, DebugCommandRegistry.Tokenize("  say \"hello world\"   x "));
-            CollectionAssert.AreEqual(new[] { "set", "" }, DebugCommandRegistry.Tokenize("set \"\""));
-            Assert.AreEqual(0, DebugCommandRegistry.Tokenize("   ").Length);
+            CollectionAssert.AreEqual(new[] { "say", "hello world", "x" }, new DebugCommandRegistry().Tokenize("  say \"hello world\"   x "));
+            CollectionAssert.AreEqual(new[] { "set", "" }, new DebugCommandRegistry().Tokenize("set \"\""));
+            Assert.AreEqual(0, new DebugCommandRegistry().Tokenize("   ").Length);
         }
 
         [Test]

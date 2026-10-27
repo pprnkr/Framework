@@ -17,7 +17,7 @@ namespace Nyonyo.Framework.Assets
     /// </remarks>
     public sealed class AssetLoader : IAssetLoader, IDisposable
     {
-        readonly Dictionary<string, List<AsyncOperationHandle>> _handles = new();
+        private readonly Dictionary<string, List<AsyncOperationHandle>> _handles = new();
 
         /// <remarks>
         /// WebGL은 Addressables 동기 로드(WaitForCompletion)를 지원하지 않아서 <see cref="NotSupportedException"/>을 던집니다.
@@ -99,7 +99,7 @@ namespace Nyonyo.Framework.Assets
             _handles.Clear();
         }
 
-        AsyncOperationHandle StartAddressable<T>(string path) where T : Object
+        private AsyncOperationHandle StartAddressable<T>(string path) where T : Object
         {
             AsyncOperationHandle handle = Addressables.LoadAssetAsync<T>(path);
             if (!_handles.TryGetValue(path, out var handles))
@@ -112,7 +112,7 @@ namespace Nyonyo.Framework.Assets
             return handle;
         }
 
-        T GetAddressableResult<T>(string path, AsyncOperationHandle handle) where T : Object
+        private T GetAddressableResult<T>(string path, AsyncOperationHandle handle) where T : Object
         {
             if (handle.Status == AsyncOperationStatus.Succeeded && handle.Result is T asset)
                 return asset;
@@ -123,7 +123,7 @@ namespace Nyonyo.Framework.Assets
                 $"Addressables에서 {path}을(를) 불러오지 못했습니다({reason}). address가 맞는지, Addressables에 등록됐는지 확인하세요.");
         }
 
-        void ReleaseHandle(string path, AsyncOperationHandle handle)
+        private void ReleaseHandle(string path, AsyncOperationHandle handle)
         {
             if (_handles.TryGetValue(path, out var handles) && handles.Remove(handle) && handles.Count == 0)
                 _handles.Remove(path);
@@ -132,7 +132,7 @@ namespace Nyonyo.Framework.Assets
                 Addressables.Release(handle);
         }
 
-        static T Validate<T>(T asset, string path, LoadType loadType) where T : Object
+        private T Validate<T>(T asset, string path, LoadType loadType) where T : Object
         {
             if (asset != null)
                 return asset;
@@ -141,11 +141,11 @@ namespace Nyonyo.Framework.Assets
                 $"{loadType}에서 {typeof(T).Name} {path}을(를) 찾지 못했습니다. Resources 폴더 기준 경로(확장자 제외)인지 확인하세요.");
         }
 
-        static string WebGLSyncLoadMessage(string path) =>
+        private string WebGLSyncLoadMessage(string path) =>
             $"WebGL에서는 Addressables 에셋 {path}을(를) 동기로 불러올 수 없습니다. " +
             "LoadAsync를 쓰거나, 팝업이라면 [Popup(Preload = true)] 또는 PopupManager.PreloadAsync로 미리 불러 두세요.";
 
-        static void ValidatePath(string path)
+        private void ValidatePath(string path)
         {
             if (string.IsNullOrEmpty(path))
                 throw new ArgumentException("에셋 경로가 비어 있습니다.", nameof(path));

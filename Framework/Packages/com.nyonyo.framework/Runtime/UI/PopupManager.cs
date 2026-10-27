@@ -31,17 +31,17 @@ namespace Nyonyo.Framework.UI
         /// <summary>층 사이의 정렬 순서 간격입니다. 씬 전환 페이드(30000)는 모든 층보다 위에 그려집니다.</summary>
         public const int SortingOrderStep = 1000;
 
-        static readonly int s_layerCount = Enum.GetValues(typeof(UILayer)).Length;
-        static readonly Predicate<PopupBase> s_isDestroyed = popup => popup == null;
+        private static readonly int s_layerCount = Enum.GetValues(typeof(UILayer)).Length;
+        private static readonly Predicate<PopupBase> s_isDestroyed = popup => popup == null;
 
-        readonly Dictionary<Type, PopupBase> _prefabs = new();
-        readonly List<PopupAttribute> _loadedPrefabs = new();
-        readonly RectTransform[] _layerRoots = new RectTransform[s_layerCount];
-        readonly List<PopupBase>[] _openPopups = new List<PopupBase>[s_layerCount];
-        readonly GameObject _root;
-        readonly IDisposable _sceneLoadedSubscription;
-        readonly IAssetLoader _loader;
-        readonly bool _ownsLoader;
+        private readonly Dictionary<Type, PopupBase> _prefabs = new();
+        private readonly List<PopupAttribute> _loadedPrefabs = new();
+        private readonly RectTransform[] _layerRoots = new RectTransform[s_layerCount];
+        private readonly List<PopupBase>[] _openPopups = new List<PopupBase>[s_layerCount];
+        private readonly GameObject _root;
+        private readonly IDisposable _sceneLoadedSubscription;
+        private readonly IAssetLoader _loader;
+        private readonly bool _ownsLoader;
 
         /// <summary>
         /// 서비스로 등록된 PopupManager입니다. <c>Services.Get&lt;PopupManager&gt;()</c>와 같습니다.
@@ -57,8 +57,7 @@ namespace Nyonyo.Framework.UI
             _ownsLoader = loader == null;
             _loader = loader ?? new AssetLoader();
 
-            var referenceResolution = settings != null ? settings.ReferenceResolution : new Vector2(1920, 1080);
-            var match = settings != null ? settings.MatchWidthOrHeight : 0.5f;
+            var referenceResolution = settings != null ? settings.ReferenceResolution : UISettings.DefaultReferenceResolution;
 
             _root = new GameObject("[UI]");
             if (parent != null)
@@ -68,7 +67,7 @@ namespace Nyonyo.Framework.UI
 
             for (var i = 0; i < s_layerCount; i++)
             {
-                _layerRoots[i] = CreateLayerCanvas((UILayer)i, referenceResolution, match);
+                _layerRoots[i] = CreateLayerCanvas((UILayer)i, referenceResolution);
                 _openPopups[i] = new List<PopupBase>();
             }
 
@@ -116,9 +115,9 @@ namespace Nyonyo.Framework.UI
         /// 로드된 게임 어셈블리에서 <c>[Popup(Preload = true)]</c>가 붙은 팝업 타입을 찾습니다.
         /// Unity와 .NET 어셈블리, 그리고 에디터에서 함께 로드되는 테스트 어셈블리는 건너뜁니다.
         /// </summary>
-        internal static List<Type> FindPreloadPopupTypes() => FindPreloadPopupTypes(GameAssemblies.Get());
+        internal List<Type> FindPreloadPopupTypes() => FindPreloadPopupTypes(GameAssemblies.Get());
 
-        internal static List<Type> FindPreloadPopupTypes(IEnumerable<Assembly> assemblies)
+        internal List<Type> FindPreloadPopupTypes(IEnumerable<Assembly> assemblies)
         {
             var result = new List<Type>();
             foreach (var assembly in assemblies)
@@ -155,16 +154,17 @@ namespace Nyonyo.Framework.UI
         }
 
         /// <summary>
-        /// <typeparamref name="T"/> 팝업을 생성해서 띄웁니다. 같은 층에 이미 팝업이 있으면 그 위에 그려집니다.
+        /// <typeparamref name="T"/> 팝업을 생성해서 엽니다. 같은 층에 이미 팝업이 있으면 그 위에 그려집니다.
+        /// 열 때마다 새 오브젝트를 만들고, <see cref="PopupBase.Close"/>하면 파괴됩니다.
         /// </summary>
         /// <remarks>
         /// 프리팹을 아직 불러오지 않았다면 그 자리에서 불러옵니다(Addressables는 WaitForCompletion).
-        /// WebGL은 동기 로드를 지원하지 않으므로, WebGL에서 Addressables 팝업을 Show로 띄우려면
-        /// <c>[Popup(Preload = true)]</c>로 미리 불러 두거나 <see cref="ShowAsync{T}"/>를 쓰세요.
+        /// WebGL은 동기 로드를 지원하지 않으므로, WebGL에서 Addressables 팝업을 Open으로 열려면
+        /// <c>[Popup(Preload = true)]</c>로 미리 불러 두거나 <see cref="OpenAsync{T}"/>를 쓰세요.
         /// </remarks>
         /// <param name="layer">팝업을 띄울 층입니다. null이면 프리팹에 설정된 층을 씁니다.</param>
         /// <returns>생성된 팝업입니다. 내용을 채우거나 닫힐 때까지 기다릴 때 씁니다.</returns>
-        public T Show<T>(UILayer? layer = null) where T : PopupBase
+        public T Open<T>(UILayer? layer = null) where T : PopupBase
         {
             if (!_prefabs.TryGetValue(typeof(T), out var prefab))
             {
@@ -176,16 +176,16 @@ namespace Nyonyo.Framework.UI
         }
 
         /// <summary>
-        /// 프리팹을 비동기로 불러온 뒤 <typeparamref name="T"/> 팝업을 띄웁니다.
+        /// 프리팹을 비동기로 불러온 뒤 <typeparamref name="T"/> 팝업을 엽니다.
         /// </summary>
-        public async Awaitable<T> ShowAsync<T>(UILayer? layer = null, CancellationToken cancellationToken = default) where T : PopupBase
+        public async Awaitable<T> OpenAsync<T>(UILayer? layer = null, CancellationToken cancellationToken = default) where T : PopupBase
         {
             var prefab = await LoadPrefabAsync(typeof(T), cancellationToken);
             return Spawn<T>(prefab, layer);
         }
 
         /// <summary>
-        /// <typeparamref name="T"/> 팝업 프리팹을 미리 불러 둡니다. 그 뒤의 <see cref="Show{T}"/>는 바로 뜹니다.
+        /// <typeparamref name="T"/> 팝업 프리팹을 미리 불러 둡니다. 그 뒤의 <see cref="Open{T}"/>는 바로 뜹니다.
         /// </summary>
         public async Awaitable PreloadAsync<T>(CancellationToken cancellationToken = default) where T : PopupBase =>
             await LoadPrefabAsync(typeof(T), cancellationToken);
@@ -233,7 +233,7 @@ namespace Nyonyo.Framework.UI
         }
 
         /// <summary>
-        /// 뒤로가기를 처리합니다. 보이는 팝업 중 가장 위 팝업부터 <see cref="PopupBase.BackKey"/> 설정에 따라 닫거나 막거나 건너뜁니다.
+        /// 뒤로가기를 처리합니다. 열린 팝업 중 가장 위 팝업부터 <see cref="PopupBase.BackKey"/> 설정에 따라 닫거나 막거나 건너뜁니다.
         /// </summary>
         /// <returns>팝업이 뒤로가기를 처리했으면 true, 처리할 팝업이 없으면 false입니다.</returns>
         public bool HandleBack()
@@ -243,10 +243,6 @@ namespace Nyonyo.Framework.UI
                 var popups = GetOpenPopupList(layer);
                 for (var i = popups.Count - 1; i >= 0; i--)
                 {
-                    // Hide()로 숨겨 둔 팝업은 뒤로가기 대상에서 빠집니다.
-                    if (!popups[i].IsVisible)
-                        continue;
-
                     switch (popups[i].BackKey)
                     {
                         case BackKeyBehavior.Ignore:
@@ -280,7 +276,7 @@ namespace Nyonyo.Framework.UI
                 disposable.Dispose();
         }
 
-        async Awaitable<PopupBase> LoadPrefabAsync(Type type, CancellationToken cancellationToken)
+        private async Awaitable<PopupBase> LoadPrefabAsync(Type type, CancellationToken cancellationToken)
         {
             if (_prefabs.TryGetValue(type, out var prefab))
                 return prefab;
@@ -298,7 +294,7 @@ namespace Nyonyo.Framework.UI
             return CachePrefab(type, info, loaded);
         }
 
-        PopupBase CachePrefab(Type type, PopupAttribute info, GameObject loaded)
+        private PopupBase CachePrefab(Type type, PopupAttribute info, GameObject loaded)
         {
             var prefab = loaded.GetComponent(type) as PopupBase;
             if (prefab == null)
@@ -313,19 +309,20 @@ namespace Nyonyo.Framework.UI
             return prefab;
         }
 
-        T Spawn<T>(PopupBase prefab, UILayer? layer) where T : PopupBase
+        private T Spawn<T>(PopupBase prefab, UILayer? layer) where T : PopupBase
         {
             var targetLayer = layer ?? prefab.Layer;
             var popup = (T)Object.Instantiate(prefab, _layerRoots[(int)targetLayer], false);
             popup.name = prefab.name;
             popup.transform.SetAsLastSibling();
 
+            popup.BeginOpen(this, targetLayer);
             _openPopups[(int)targetLayer].Add(popup);
-            popup.Open(this, targetLayer);
+            popup.EndOpen();
             return popup;
         }
 
-        static PopupAttribute GetPopupAttribute(Type type)
+        private PopupAttribute GetPopupAttribute(Type type)
         {
             var info = type.GetCustomAttribute<PopupAttribute>();
             if (info == null || string.IsNullOrEmpty(info.Path))
@@ -346,21 +343,21 @@ namespace Nyonyo.Framework.UI
         }
 
         // Close를 거치지 않고 Destroy된 팝업이 목록에 남지 않도록 꺼낼 때마다 정리합니다.
-        List<PopupBase> GetOpenPopupList(int layer)
+        private List<PopupBase> GetOpenPopupList(int layer)
         {
             var popups = _openPopups[layer];
             popups.RemoveAll(s_isDestroyed);
             return popups;
         }
 
-        void OnSceneLoaded(SceneLoaded evt)
+        private void OnSceneLoaded(SceneLoaded evt)
         {
             for (var layer = s_layerCount - 1; layer >= 0; layer--)
                 CloseWhere(layer, popup => popup.CloseOnSceneChange);
         }
 
-        // 닫히는 팝업의 Closed 핸들러가 다른 팝업을 닫아도 안전하도록 복사본을 위에서부터 순회합니다.
-        void CloseWhere(int layer, Predicate<PopupBase> match)
+        // 닫히는 팝업의 PrevClose, PostClose, OnClosed 콜백이 다른 팝업을 닫아도 안전하도록 복사본을 위에서부터 순회합니다.
+        private void CloseWhere(int layer, Predicate<PopupBase> match)
         {
             var snapshot = GetOpenPopupList(layer).ToArray();
             for (var i = snapshot.Length - 1; i >= 0; i--)
@@ -371,7 +368,7 @@ namespace Nyonyo.Framework.UI
             }
         }
 
-        RectTransform CreateLayerCanvas(UILayer layer, Vector2 referenceResolution, float match)
+        private RectTransform CreateLayerCanvas(UILayer layer, Vector2 referenceResolution)
         {
             var go = new GameObject($"{layer} Layer", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             go.transform.SetParent(_root.transform, false);
@@ -383,13 +380,13 @@ namespace Nyonyo.Framework.UI
             var scaler = go.GetComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = referenceResolution;
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-            scaler.matchWidthOrHeight = match;
+            // Expand: 기준 해상도 영역이 항상 화면 안에 다 보이도록 맞추고, 남는 쪽은 캔버스가 늘어납니다.
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
 
             return (RectTransform)go.transform;
         }
 
-        void EnsureEventSystem()
+        private void EnsureEventSystem()
         {
             if (!Application.isPlaying || EventSystem.current != null)
                 return;

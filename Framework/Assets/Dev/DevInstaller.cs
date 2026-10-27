@@ -20,8 +20,8 @@ namespace Nyonyo.Dev
     [CreateAssetMenu(menuName = "Nyonyo Dev/Dev Installer", fileName = "DevInstaller")]
     public class DevInstaller : GameInstaller
     {
-        [SerializeField] UISettings _uiSettings;
-        [SerializeField] SoundSettings _soundSettings;
+        [SerializeField] private UISettings _uiSettings;
+        [SerializeField] private SoundSettings _soundSettings;
 
         public override void Install(ServiceRegistry services)
         {

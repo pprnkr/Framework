@@ -1,4 +1,5 @@
 using System;
+using UnityEngine.Scripting;
 
 namespace Nyonyo.Framework.Debugging
 {
@@ -20,8 +21,13 @@ namespace Nyonyo.Framework.Debugging
     /// // 콘솔에서: gold 500
     /// </code>
     /// </example>
+    /// <remarks>
+    /// 명령 함수는 코드 어디에서도 직접 호출되지 않으므로, IL2CPP 빌드(Android, iOS, WebGL)의 코드 제거(Managed Stripping)에서 지워질 수 있습니다.
+    /// 그래서 <see cref="PreserveAttribute"/>를 상속해, 이 어트리뷰트를 붙인 함수가 빌드에 남도록 합니다.
+    /// </remarks>
     [AttributeUsage(AttributeTargets.Method, Inherited = false)]
-    public sealed class DebugCommandAttribute : Attribute
+    [RequireAttributeUsages]
+    public sealed class DebugCommandAttribute : PreserveAttribute
     {
         public DebugCommandAttribute(string name, string description = "")
         {

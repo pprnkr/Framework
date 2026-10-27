@@ -31,7 +31,7 @@ https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.fram
 
 ### 1. 설정 파일 만들기
 
-메뉴 **Tools > Nyonyo Framework > Create Settings**를 실행하면 `Assets/Resources/NyonyoFrameworkSettings.asset`이 만들어집니다. 이 파일이 없으면 서비스 없이 시작하고 콘솔에 경고를 띄웁니다.
+메뉴 **Tools > Nyonyo Framework > Settings > Framework Settings**를 실행하면 `Assets/Resources/NyonyoFrameworkSettings.asset`이 만들어집니다. 이 파일이 없으면 서비스 없이 시작하고 콘솔에 경고를 띄웁니다.
 
 ### 2. 서비스 만들기
 
@@ -173,7 +173,10 @@ public override void Install(ServiceRegistry services)
 ### 2. 사용하기
 
 ```csharp
-await Services.Get<ISceneService>().LoadAsync("Stage1");
+Services.Get<ISceneService>().Load("Stage1");
+
+// 전환이 끝날 때까지 기다리거나 결과(중복 요청이면 false)가 필요할 때만
+var loaded = await Services.Get<ISceneService>().LoadAsync("Stage1");
 ```
 
 - **Scene List 등록:** 씬은 **Build Profiles의 Scene List**에 추가되어 있어야 합니다. 없으면 예외가 납니다.
@@ -206,10 +209,13 @@ UI를 5개 층(`UILayer`)으로 나눠 그립니다. 높은 층은 항상 낮은
 
 | 클래스 | 담당 |
 |---|---|
-| `UIBase` | 모든 UI의 기본. 표시/숨김(`Show`, `Hide`, `OnShow`, `OnHide`), 버튼 이벤트(`public virtual OnButtonEvent(Button)`), 에디터 자동 매핑 |
-| `PopupBase : UIBase` | 팝업. 층, 뒤로가기, 닫기(`Close`, `OnOpen`, `Closed`, `WaitUntilClosedAsync`) |
+| `UIBase` | 공통 기본(직접 상속하지 않음). 버튼 이벤트(OnClick 진입점 `OnButtonEvent(Button)` → 클릭 효과음 → `protected virtual OnButtonClick(Button)`), 에디터 자동 매핑 |
+| `PopupBase : UIBase` | 팝업. **Open/Close**: `PopupManager.Open<T>()`로 생성되고 `Close()`로 즉시 Destroy됩니다. 층, 뒤로가기, `PrevOpen`/`PostOpen`/`PrevClose`/`PostClose`, `OnClosed`, `WaitUntilClosedAsync` |
+| `UIView : UIBase` | 팝업 안의 UI 묶음(탭, 목록 항목 등). **Show/Hide**: `SetActive`만 켜고 끄며, 파괴하지 않습니다. `OnShow`/`OnHide`, `IsVisible` |
 
-팝업 안에서 따로 동작하는 큰 UI 묶음(탭, 목록 항목 등)은 `UIBase`를 상속한 별도 스크립트로 만들어 자식 오브젝트에 붙입니다.
+- **단어 규칙:** 팝업은 Open/Close(생성과 파괴), UIView는 Show/Hide(켜기와 끄기)만 씁니다. 팝업에는 숨겨 두는 상태가 없습니다.
+- **함께 파괴:** 팝업 자식으로 둔 `UIView`는 팝업을 닫으면 함께 파괴됩니다. 이때 `OnHide`는 호출되지 않습니다.
+- **재정의 규칙:** 바깥에서 부르는 함수(`Close`, `Show`, `Hide`, `OnButtonEvent`)는 재정의할 수 없고, 상속한 쪽은 훅 함수(팝업의 `PrevOpen`, `PostOpen`, `PrevClose`, `PostClose`, UIView의 `OnShow`, `OnHide`, 공통 `OnButtonClick`)만 재정의합니다.
 
 ### 1. 팝업 만들기
 
@@ -219,15 +225,22 @@ UI를 5개 층(`UILayer`)으로 나눠 그립니다. 높은 층은 항상 낮은
 [Popup(Path = "Assets/Popups/PopupTest.prefab", LoadType = LoadType.Addressables)]
 public class PopupTest : PopupBase
 {
-    protected override void OnOpen() { /* 생성 직후 초기화 */ }
+    protected override void PostOpen() { /* 열린 직후 초기화 */ }
 
-    // 버튼 OnClick에 연결하면 모든 버튼 클릭이 여기로 모입니다.
-    public override void OnButtonEvent(Button button)
+    protected override void PrevClose() { /* 닫히기 시작할 때 정리 */ }
+
+    [SerializeField] private Button BTN_Ok;
+
+    // OnClick에 OnButtonEvent를 연결한 버튼은 클릭 효과음이 나온 뒤 여기로 모입니다.
+    protected override void OnButtonClick(Button button)
     {
-        switch (button.name)
+        if (button == BTN_Ok)
         {
-            case "BTN_Ok": Close(); break;
-            default: base.OnButtonEvent(button); break;
+            Close();
+        }
+        else
+        {
+            base.OnButtonClick(button);
         }
     }
 }
@@ -238,7 +251,10 @@ public class PopupTest : PopupBase
   - **Resources:** `Path`는 Resources 폴더 기준 경로이고 확장자를 뺍니다(예: `Popups/Loading`).
   - **자동 매퍼:** 자동 매퍼로 만들면 프리팹 위치에 맞춰 이 값이 자동으로 들어가고, Addressables에도 자동으로 등록됩니다.
 - **버튼 연결:** 버튼 클릭은 자동으로 연결되지 않습니다. Button의 **OnClick**에 `OnButtonEvent`를 연결하고 인자로 그 Button을 넘기세요. 자동 매퍼의 **Assign Object**를 쓰면 `BTN_` 버튼은 자동으로 연결됩니다.
-- **닫기 버튼:** OnClick에 `Close`를 직접 연결하거나 `OnButtonEvent`에서 `Close()`를 호출하세요.
+- **클릭 처리:** `OnButtonEvent`는 재정의할 수 없습니다. 클릭 처리는 `OnButtonClick`을 재정의하세요.
+- **버튼 구분:** 버튼은 이름(`button.name`)이 아니라 필드와 비교합니다. 이름이 같은 버튼이 있어도 헷갈리지 않습니다. C#의 `case` 라벨에는 상수만 쓸 수 있어서 `switch` 대신 `if (button == BTN_Ok) ... else if ...`로 분기합니다.
+- **클릭 효과음:** 모든 `OnButtonEvent` 버튼은 클릭할 때 `SoundManager.PlaySFX("Click")`을 재생합니다(`UIBase.ButtonClickSound`, 기본 경로 `SFX/Click`). 이름은 `Click`으로 고정이니 게임마다 이 이름으로 효과음을 준비하세요. `SoundManager`를 등록하지 않았으면 재생하지 않습니다. 특정 UI만 다른 소리를 내거나 끄려면 `PlayButtonSound(Button)`을 재정의하세요.
+- **닫기 버튼:** OnClick에 `Close`를 직접 연결하거나 `OnButtonClick`에서 `Close()`를 호출하세요. OnClick에 `Close`를 직접 연결하면 클릭 효과음은 나오지 않습니다.
 
 인스펙터에서는 다음 항목을 설정합니다.
 
@@ -248,11 +264,36 @@ public class PopupTest : PopupBase
 | **Back Key** | 뒤로가기 키 동작. `Close`(닫기), `Block`(막기), `Ignore`(건너뛰기) 중에서 고릅니다. |
 | **Close On Scene Change** | 씬이 바뀔 때 자동으로 닫을지 여부 |
 
-`Close()`는 팝업 오브젝트를 `Destroy`합니다. `Close()`를 재정의할 때는 마지막에 `base.Close()`를 호출하세요.
+열고 닫을 때 훅이 다음 순서로 호출됩니다. `Close()`는 재정의할 수 없고, 마지막에 팝업 오브젝트를 즉시 `Destroy`합니다.
+
+```
+열기: 생성 → PrevOpen → 열린 팝업 목록에 추가 → PostOpen
+닫기: Close → PrevClose → 열린 팝업 목록에서 제거 → PostClose → OnClosed 콜백 → Destroy
+```
+
+| 훅 | 언제 쓰나 |
+|---|---|
+| `PrevOpen` | 목록에 들어가기 전. 아직 `Find`나 `GetOpenPopups`에 나오지 않습니다. |
+| `PostOpen` | 보통의 초기화. 목록에 들어간 뒤라 같은 층의 다른 팝업 수 등을 볼 수 있습니다. |
+| `PrevClose` | 닫히기 시작할 때. 아직 목록에 남아 있습니다. |
+| `PostClose` | 목록에서 빠진 뒤, 연 쪽의 `OnClosed` 콜백보다 먼저. |
+
+- **팝업 안에서 할 일:** 위 훅을 재정의합니다.
+- **팝업을 연 쪽에서 할 일:** `Open<T>().OnClosed(() => ...)`로 등록합니다. 여러 번 등록할 수 있고, 이미 닫힌 팝업에 등록하면 바로 실행합니다.
 
 ### 2. 등록하기
 
-**Create > Nyonyo Framework > UI Settings**로 설정 에셋을 만듭니다. 이 에셋에서 기준 해상도와 뒤로가기 처리를 정합니다. 그다음 Installer에서 등록합니다. 프리팹 목록은 따로 없고, 각 팝업 클래스의 `[Popup]`으로 불러옵니다.
+**Tools > Nyonyo Framework > Settings > UI Settings**로 설정 에셋을 만듭니다. 이 에셋에서 화면 방향, 기준 해상도, 뒤로가기 처리를 정합니다. 그다음 Installer에서 등록합니다. 프리팹 목록은 따로 없고, 각 팝업 클래스의 `[Popup]`으로 불러옵니다.
+
+| 항목 | 내용 |
+|---|---|
+| **Orientation** | 게임 화면 방향. `Portrait`(세로형, 기본값) 또는 `Landscape`(가로형) |
+| **Reference Resolution** | UI를 디자인한 기준 해상도. 기본값은 1080x1920입니다. 가로·세로 순서는 Orientation에 맞춰 자동으로 정렬되므로, 가로형으로 바꿀 때 해상도를 다시 입력하지 않아도 됩니다. |
+| **Handle Back Key** | 뒤로가기 키로 맨 위 팝업을 닫을지 여부 |
+
+- **Player Settings 맞추기:** UI Settings 인스펙터는 Player Settings의 화면 방향이나 기본 창 크기가 Orientation과 다르면 경고하고 **Player Settings에 적용** 버튼을 보여 줍니다. 누르면 자동 회전을 해당 방향으로만 허용하고(세로형은 정방향 세로만, 가로형은 좌우 가로), 창 모드 기본 크기를 기준 해상도로 맞춥니다. 코드에서는 `OrientationPlayerSettings.Apply(settings)`를 호출합니다.
+- **화면 맞춤:** Canvas Scaler는 `Expand`로 고정입니다. 기준 해상도 영역은 어떤 비율의 화면에서도 잘리지 않고 다 보이며, 화면이 더 길거나 넓으면 그쪽으로 캔버스가 늘어납니다. 가장자리에 붙는 UI는 앵커를 화면 모서리에 두세요.
+- **Game 뷰:** 에디터 Game 뷰의 해상도는 직접 1080x1920(세로) 등으로 골라 주세요.
 
 ```csharp
 [SerializeField] UISettings _uiSettings;
@@ -269,22 +310,25 @@ public override void Install(ServiceRegistry services)
 }
 ```
 
-- **프리팹 로드 시점:** 프리팹은 처음 `Show`할 때 불러오고 그 뒤로는 재사용합니다. `PopupManager`가 정리될 때 로더에 반환합니다.
+- **프리팹 로드 시점:** 프리팹은 처음 `Open`할 때 불러오고 그 뒤로는 재사용합니다. `PopupManager`가 정리될 때 로더에 반환합니다.
 - **EventSystem:** Play 중에 EventSystem이 없으면 `PopupManager`가 직접 만들어서 유지합니다. 그러니 **씬에는 EventSystem을 두지 마세요.**
 - **씬 전환 시 자동 닫기:** `eventBus`를 넘기면 씬이 바뀔 때 `Close On Scene Change` 팝업을 자동으로 닫습니다.
 
 ### 3. 사용하기
 
 ```csharp
-// 띄우기: 프리팹에 설정된 층에 뜹니다.
-var popup = PopupManager.Instance.Show<PopupTest>();
+// 열기: 프리팹에 설정된 층에 뜹니다.
+var popup = PopupManager.Instance.Open<PopupTest>();
 
 // 층 직접 지정
-PopupManager.Instance.Show<PopupTest>(UILayer.System);
+PopupManager.Instance.Open<PopupTest>(UILayer.System);
 
-// 비동기로 불러와서 띄우기, 미리 불러 두기
-var shop = await PopupManager.Instance.ShowAsync<PopupShop>();
+// 비동기로 불러와서 열기, 미리 불러 두기
+var shop = await PopupManager.Instance.OpenAsync<PopupShop>();
 await PopupManager.Instance.PreloadAsync<PopupShop>();
+
+// 닫힌 뒤 할 일을 열면서 바로 정하기
+PopupManager.Instance.Open<PopupShop>().OnClosed(() => RefreshGold());
 
 // 닫힐 때까지 기다리기 (확인창 응답 등)
 await popup.WaitUntilClosedAsync();
@@ -296,9 +340,10 @@ PopupManager.Instance.CloseAll(UILayer.Popup);  // 층을 생략하면 전부 �
 ```
 
 - **`PopupManager.Instance`:** `Services.Get<PopupManager>()`의 줄임말입니다. 싱글톤이 아니어서 도메인 리로드를 꺼도 안전합니다.
-- **`Show`와 `ShowAsync`:** 프리팹을 아직 불러오지 않았다면 `Show`는 그 자리에서 불러옵니다(Addressables의 `WaitForCompletion`). WebGL에서는 `WaitForCompletion`을 쓸 수 없으니 `ShowAsync`나 `PreloadAsync`를 쓰세요.
-- **미리 불러오기:** `[Popup(..., Preload = true)]`를 주면 게임 시작(부트스트랩 초기화) 때 프리팹을 미리 불러옵니다. 그래서 WebGL에서도 `Show`로 바로 띄울 수 있습니다. 비동기 초기화이므로, 첫 씬에서 바로 띄울 때는 `await Bootstrapper.WaitUntilReadyAsync()` 뒤에 띄우세요.
-- **뒤로가기 키:** ESC 키와 안드로이드 뒤로가기는 보이는 팝업 중 가장 위 팝업부터 `Back Key` 설정대로 처리합니다. `Hide()`로 숨긴 팝업은 건너뜁니다. 닫을 팝업이 없으면 `BackKeyUnhandled` 이벤트가 호출됩니다. 게임 종료 확인창을 띄울 때 쓰면 됩니다.
+- **`Open`과 `OpenAsync`:** 프리팹을 아직 불러오지 않았다면 `Open`은 그 자리에서 불러옵니다(Addressables의 `WaitForCompletion`). WebGL에서는 `WaitForCompletion`을 쓸 수 없으니 `OpenAsync`나 `PreloadAsync`를 쓰세요.
+- **미리 불러오기:** `[Popup(..., Preload = true)]`를 주면 게임 시작(부트스트랩 초기화) 때 프리팹을 미리 불러옵니다. 그래서 WebGL에서도 `Open`으로 바로 열 수 있습니다. 비동기 초기화이므로, 첫 씬에서 바로 열 때는 `await Bootstrapper.WaitUntilReadyAsync()` 뒤에 여세요.
+- **뒤로가기 키:** ESC 키와 안드로이드 뒤로가기는 열린 팝업 중 가장 위 팝업부터 `Back Key` 설정대로 처리합니다. 닫을 팝업이 없으면 `BackKeyUnhandled` 이벤트가 호출됩니다. 게임 종료 확인창을 띄울 때 쓰면 됩니다. iOS에는 뒤로가기 버튼이 없으니, 모든 팝업에 화면 닫기 버튼도 두세요.
+- **안전 영역(노치):** 버튼과 글자를 담는 오브젝트에 `SafeAreaFitter`를 붙이면 노치, 펀치홀, 홈 인디케이터를 피합니다. 배경과 Dim은 그 밖에 두어 화면 끝까지 채웁니다. PC와 WebGL에서는 화면 전체에 맞춰지므로 같은 프리팹을 그대로 씁니다.
 - **팝업이 아닌 UI:** HUD처럼 팝업이 아닌 UI를 같은 층 규칙으로 그리려면 `GetLayerRoot(UILayer.Screen)`의 자식으로 붙이세요.
 
 ## 에셋 로딩 (`Nyonyo.Framework.Assets`)
@@ -330,7 +375,7 @@ BGM과 효과음을 이름으로 재생합니다. 이름은 `SoundSettings`의 �
 ### 1. 사운드 준비
 
 1. 사운드 파일을 BGM 폴더와 효과음 폴더에 넣습니다. 기본 폴더는 `Assets/Sounds/BGM`, `Assets/Sounds/SFX`입니다.
-2. **Create > Nyonyo Framework > Sound Settings**로 설정 에셋을 만듭니다. 폴더를 바꿨다면 여기서 고칩니다.
+2. **Tools > Nyonyo Framework > Settings > Sound Settings**로 설정 에셋을 만듭니다. 폴더를 바꿨다면 여기서 고칩니다.
 3. 메뉴 **Tools > Nyonyo Framework > Sound > Register Sounds to Addressables**를 실행합니다. 그러면 `Assets/Sounds/BGM/Title.wav`가 address `BGM/Title`로 등록됩니다.
 
 Load Type을 Resources로 바꾸면 사운드를 `Resources/BGM`, `Resources/SFX`에 두면 되고, 등록은 필요 없습니다.
@@ -360,9 +405,14 @@ SoundManager.Instance.SfxVolume = 1f;
 SoundManager.Instance.VolumeChanged += RefreshSliders;
 
 // 첫 재생 지연을 없애려면 미리 불러 두기, 다 쓰면 내리기
-await SoundManager.Instance.PreloadSFX("Hit", "Coin");
+await SoundManager.Instance.PreloadSFXAsync("Hit", "Coin");
 SoundManager.Instance.UnloadAllSFX();
+
+// 끝날 때까지 기다려야 할 때만 Async 버전을 씁니다.
+await SoundManager.Instance.PlayBGMAsync("Ending", fadeSeconds: 2f);
 ```
+
+- **비동기 처리:** `PlayBGM`, `StopBGM`, `PlaySFX`는 `void`입니다. 불러오기와 페이드는 내부에서 진행되므로 `await`나 `_ =` 없이 부르면 됩니다. 이미 불러온 효과음은 그 자리에서 바로 재생됩니다. 크로스페이드가 끝날 때까지 기다리는 등 완료 시점이 필요하면 `PlayBGMAsync`, `StopBGMAsync`, `PlaySFXAsync`를 쓰세요.
 
 - **실제 볼륨:** BGM은 `MasterVolume × BgmVolume × 재생 volume`, 효과음은 `MasterVolume × SfxVolume × 재생 volume`입니다. 볼륨을 바꾸면 재생 중인 소리에도 바로 반영됩니다.
 - **동시 재생 수:** 효과음은 기본 8개까지 동시에 들립니다(`SoundSettings`의 SFX Channels). 다 차면 가장 오래된 효과음을 끊고 재생합니다.
@@ -406,7 +456,7 @@ services.Register(new PoolManager(Bootstrapper.Root));
 
 var bullet = PoolManager.Instance.Spawn(bulletPrefab, muzzle.position, muzzle.rotation);
 PoolManager.Instance.Despawn(bullet);
-_ = PoolManager.Instance.DespawnAfter(effect, 1f);
+PoolManager.Instance.DespawnAfter(effect, 1f);   // 기다려야 하면 DespawnAfterAsync
 PoolManager.Instance.Prewarm(bulletPrefab, 20);
 ```
 
@@ -454,15 +504,48 @@ PauseService.Instance.TimeScale = 0.3f; // 슬로 모션
 
 ## 트윈 (`Nyonyo.Framework.Tweening`)
 
+DOTween과 같은 이름과 체이닝으로 씁니다. 서비스 등록은 필요 없습니다.
+
 ```csharp
-await panel.FadeAsync(1f, 0.3f, unscaledTime: true);
-await icon.transform.ScaleAsync(Vector3.one * 1.2f, 0.15f, Ease.OutBack);
-await rect.AnchoredMoveAsync(new Vector2(0, 200), 0.4f, Ease.OutCubic);
-await Tween.To(0f, 100f, 1f, v => label.text = $"{v:0}");
+transform.DOMoveX(5f, 0.5f).SetEase(Ease.OutBack).SetDelay(0.2f);
+icon.DOFade(0f, 1f).SetLoops(-1, LoopType.Yoyo);
+button.transform.DOPunchScale(Vector3.one * 0.2f, 0.3f);
+rect.DOAnchorPosY(200f, 0.4f).SetRelative().OnComplete(() => Debug.Log("도착"));
+await panel.DOFade(1f, 0.3f).SetUpdate(true);                  // 일시정지 중에도 움직임
+await Tween.To(() => score, v => label.text = v.ToString(), 100, 1f);
+tmp.maxVisibleCharacters = 0;
+Tween.To(() => tmp.maxVisibleCharacters, v => tmp.maxVisibleCharacters = v, tmp.text.Length, 1f).SetEase(Ease.Linear); // 타자기
+
+Sequence.Create()
+    .Append(popup.DOScale(1f, 0.3f).From(Vector3.zero).SetEase(Ease.OutBack))
+    .Join(group.DOFade(1f, 0.3f))
+    .AppendInterval(1f)
+    .AppendCallback(() => Debug.Log("끝"))
+    .SetUpdate(true);
+
+Tween.DelayedCall(2f, Respawn);
+transform.DOKill();                                             // 이 Transform의 트윈 모두 멈춤
 ```
 
-- **용도:** 외부 라이브러리 없이 UI 연출 정도를 처리하는 가벼운 도구입니다. 대상이 파괴되면 조용히 멈추고, `CancellationToken`으로 취소할 수 있습니다.
-- **복잡한 연출:** 오브젝트 수백 개를 동시에 움직이는 연출에는 PrimeTween이나 DOTween을 권합니다.
+| 대상 | 함수 |
+|---|---|
+| Transform | `DOMove(X/Y/Z)`, `DOLocalMove(X/Y/Z)`, `DORotate`, `DOLocalRotate`, `DOScale(X/Y/Z)`, `DOJump`, `DOLocalJump`, `DOPunchPosition/Scale/Rotation`, `DOShakePosition/Rotation/Scale` |
+| RectTransform | `DOAnchorPos(X/Y)`, `DOSizeDelta`, `DOPunchAnchorPos`, `DOShakeAnchorPos`, `DOJumpAnchorPos` |
+| UI | `CanvasGroup.DOFade`, `Graphic.DOFade/DOColor`(Image, Text 등), `Image.DOFillAmount`, `Slider.DOValue`, `ScrollRect.DONormalizedPos/DOHorizontalNormalizedPos/DOVerticalNormalizedPos` |
+| 기타 | `SpriteRenderer.DOFade/DOColor`, `Camera.DOOrthoSize/DOColor`, `AudioSource.DOFade/DOPitch`, `Material.DOColor/DOFade/DOFloat`, `Rigidbody2D.DOMove(X/Y)/DORotate/DOJump` |
+| 범용 | `Tween.To`(float, int, Vector2, Vector3, Color, 직접 보간), `Tween.DelayedCall`, `Sequence.Create` |
+| 설정 | `SetEase`(31종 또는 AnimationCurve), `SetDelay`, `SetLoops`(Restart, Yoyo, Incremental), `SetUpdate`, `SetRelative`, `From`, `SetAutoKill`, `SetId`, `SetLink`, `SetCancellation` |
+| 콜백 | `OnStart`, `OnUpdate`, `OnStepComplete`, `OnComplete`, `OnKill` |
+| 제어 | `Play`, `Pause`, `TogglePause`, `Restart`, `Rewind`, `Complete`, `Kill(complete)`, `Tween.KillTarget(대상 또는 Id)`, `Tween.KillAll`, `Tween.IsTweening` |
+
+- **시작 시점:** 트윈은 다음 프레임부터 움직이고, 시작 값은 지연이 끝난 뒤 처음 움직일 때 읽습니다. 설정은 만든 직후에 이어 붙이세요.
+- **끝과 정리:** 끝나면 자동으로 없어집니다. 다시 재생할 트윈은 `SetAutoKill(false)`로 만들고 `Restart()`하세요. 다 쓴 뒤에는 직접 Kill해야 합니다.
+- **파괴와 취소:** 대상이 파괴되면 조용히 멈춥니다. `Tween.To`는 대상이 없으니 `SetLink(gameObject)`를 붙이세요. `SetCancellation(token)`으로 취소하면 await에서 `OperationCanceledException`이 납니다.
+- **await:** 끝나거나 Kill되면 이어서 진행합니다. 무한 반복 트윈은 Kill하기 전까지 끝나지 않습니다.
+- **DOKill 범위:** `transform.DOKill()`은 Transform 트윈만 멈춥니다. `image.DOFade`처럼 다른 컴포넌트가 대상인 트윈은 `image.DOKill()`로 멈추세요.
+- **시퀀스:** 시퀀스에 넣은 트윈은 직접 제어할 수 없고, 이미 시작된 트윈이나 무한 반복 트윈은 넣을 수 없습니다. 시퀀스의 기본 곡선은 Linear입니다.
+- **2D 기준:** float 세기의 Shake는 위치와 크기는 XY만, 회전은 Z만 흔듭니다. 카메라 흔들기는 `CameraShake`를 쓰세요(CameraFollow2D가 위치를 덮어씁니다).
+- **동작 범위:** Play 모드의 메인 스레드에서만 움직입니다. Edit 모드 에디터 도구에서는 쓰지 마세요.
 
 ## 입력 (`Nyonyo.Framework.Inputs`, Input System 필요)
 
@@ -493,25 +576,90 @@ input.ResetBindings();
 
 픽셀 아트라면 URP의 **Pixel Perfect Camera** 컴포넌트를 함께 쓰세요.
 
-## 데이터 테이블 (`Nyonyo.Framework.Data`)
+## 게임 데이터 (`Nyonyo.Framework.Data`)
+
+구글 스프레드시트의 시트마다 클래스를 자동으로 만들고, 데이터는 암호화된 바이너리(`.bytes`)로 저장합니다. 런타임에는 리플렉션 없이 생성 코드가 바로 읽으므로 IL2CPP(AOT)에서도 빠릅니다.
+
+### 1. 시트 작성
+
+| 행 | 내용 | 예 |
+|---|---|---|
+| 1행 | 주석(생성 코드의 문서 주석) | 아이템 ID / 공격력 / 공격력 / 이름 |
+| 2행 | 자료형 | int / int[] / int[] / string |
+| 3행 | 변수명 | Id / Attack / Attack / Name |
+| 4행부터 | 데이터 | 1001 / 10 / 20 / 검 → `Attack[0]=10`, `Attack[1]=20` |
+
+- **유니크 키:** 첫 번째 열은 무조건 유니크 키입니다. 자료형은 int, long, string 중 하나이고, 키가 겹치면 가져오기가 에러로 멈춥니다.
+- **자료형:** int, long, float, double, bool, string, enum(프로젝트의 C# enum 이름), 그리고 각각의 배열(`int[]`)을 씁니다.
+  - **배열 표기:** `Array<int>`, `List<int>`라고 적어도 배열로 만듭니다.
+- **배열 열:** 같은 변수명을 가진 열들이 왼쪽부터 원소가 됩니다. 빈 칸은 건너뜁니다.
+- **빈 칸:** 단일 값의 빈 칸은 기본값(0, false, 빈 문자열, enum 0)입니다.
+- **건너뛰기:** 아래 경우는 가져오지 않습니다(기획 메모용).
+  - 변수명이 `_`로 시작하는 열
+  - 키가 `_`로 시작하는 행
+  - 이름이 `_`로 시작하는 시트
+  - 키가 빈 빈 행
+- **이름 규칙:** 시트 이름은 클래스 이름이 되므로 영문, 숫자, `_`만 씁니다. 시트 `Item`이면 행 클래스는 `ItemData`, 테이블은 `ItemTable`입니다.
+- **공유 설정:** 스프레드시트의 일반 액세스는 **"제한됨"** 그대로 둡니다. 아래에서 만드는 **서비스 계정 이메일만 뷰어로 추가**합니다.
+
+### 2. 서비스 계정 준비 (한 번만)
+
+시트를 공개하지 않고 읽기 위해, 구글 서비스 계정(사람이 아닌 읽기 전용 계정)을 씁니다.
+
+1. [Google Cloud Console](https://console.cloud.google.com)에서 프로젝트를 고르거나 만들고, **API 및 서비스 > 라이브러리**에서 **Google Drive API**를 사용 설정합니다.
+2. **IAM 및 관리자 > 서비스 계정 > 서비스 계정 만들기**를 누릅니다. 역할은 주지 않아도 됩니다.
+3. 만든 서비스 계정에서 **키 > 키 추가 > 새 키 만들기 > JSON**을 고르면 키 파일이 내려받아집니다.
+4. 키 파일은 **git 저장소 밖**(예: 문서 폴더)에 둡니다. 비밀번호와 같으니 커밋하거나 메신저로 보내지 마세요.
+   - **팀원:** 팀원마다 같은 서비스 계정에서 키를 따로 만들어 쓰면, 퇴사자의 키만 지울 수 있습니다.
+   - **조직 정책:** 회사 Google Workspace 정책으로 키 만들기가 막혀 있으면 관리자에게 요청하세요.
+
+### 3. 설정과 가져오기
+
+1. Tools > Nyonyo Framework > Settings > Game Data Settings를 엽니다.
+2. **[키 파일 선택]**으로 JSON 키를 고릅니다.
+   - **저장 위치:** 경로는 이 컴퓨터의 EditorPrefs에만 저장되고 에셋에는 들어가지 않습니다.
+   - **빌드 서버:** 비워 두면 환경 변수 `GOOGLE_APPLICATION_CREDENTIALS`를 씁니다.
+3. 표시된 서비스 계정 이메일을 **[이메일 복사]**로 복사합니다. 구글 시트 **[공유]**에 붙여 넣고 **뷰어**로 추가합니다.
+4. Spreadsheets에 스프레드시트 주소를 넣습니다. 시트 목록을 비워 두면 `_`로 시작하지 않는 모든 시트를 가져옵니다.
+5. 인스펙터의 **가져오기**(또는 Tools > Nyonyo Framework > Game Data > Import All)를 누릅니다.
+   - **에러 안내:** 서비스 계정 공유 누락, Drive API 꺼짐, 키 오류는 원인과 해결 방법을 그대로 알려 줍니다.
+   - **크기 제한:** Drive API 내보내기는 스프레드시트 하나당 10MB까지라, 넘으면 스프레드시트를 나눕니다.
+   - **에러가 있을 때:** 문제가 된 셀(`Item!C5`)을 모두 콘솔에 보여 주고, 파일은 하나도 바꾸지 않습니다.
+   - **만들어지는 것:** 코드 폴더에 `*.g.cs`, 데이터 폴더에 `*.bytes`가 생깁니다. Addressables면 address(`GameData/Item`)도 등록합니다.
+   - **바뀌지 않은 시트:** 같은 파일이 나오므로 git 변경으로 잡히지 않습니다.
+6. Installer에서 등록합니다. 게임 시작 때 모든 테이블을 비동기로 불러옵니다.
 
 ```csharp
-[Serializable]
-public class ItemRow : IDataRow
-{
-    public string id; public string name; public int price; public ItemGrade grade;
-    public string Id => id;
-}
-
-[CreateAssetMenu(menuName = "MyGame/Item Table")]
-public class ItemTable : DataTable<ItemRow> { }
-
-var potion = itemTable.Get("potion_small");
+var assets = new AssetLoader();
+services.Register<IAssetLoader>(assets);
+services.Register(new GameData(assets));
 ```
 
-- **CSV 가져오기:** 테이블 에셋을 우클릭(인스펙터 ⋮)하고 **Import CSV...**를 선택해서 엑셀이나 구글 시트에서 내보낸 CSV를 가져옵니다. **Reimport CSV**는 마지막 파일을 다시 읽습니다.
-- **머리글 규칙:** 머리글은 필드 이름과 맞춥니다(대소문자 무시, `_hp`는 `hp`로도 맞음). `#`로 시작하는 열과 행은 메모로 보고 건너뜁니다.
-- **지원 타입:** string, int, long, float, double, bool(true/1/yes/o), enum을 지원합니다. 형식이 틀리면 몇 번째 줄인지 알려 주고, 테이블은 바꾸지 않습니다.
+### 4. 사용
+
+```csharp
+var sword = GameData.Instance.Item.Get(1001);          // 없으면 KeyNotFoundException
+if (GameData.Instance.Item.TryGet(id, out var item)) { }
+foreach (var monster in GameData.Instance.Monster.All) { }
+
+// 생성 코드는 고치지 말고, 다른 폴더에 같은 이름의 partial 클래스로 덧붙입니다.
+public sealed partial class ItemData
+{
+    public int TotalAttack { get; private set; }
+    partial void OnLoaded() => TotalAttack = Attack.Sum();   // 행을 읽은 직후
+}
+
+public sealed partial class GameData
+{
+    protected override void OnLoaded() { /* 모든 테이블을 읽은 뒤: 테이블끼리 참조 연결 */ }
+}
+```
+
+- **배열을 쓰는 이유:** 로드한 뒤 크기가 바뀌지 않는 데이터라 List보다 배열이 가볍고 빠릅니다. 값은 바꾸지 않는다는 약속으로 쓰세요.
+- **코드와 데이터 확인:** 열 구성이 바뀌면 코드와 데이터 파일이 함께 바뀌어야 합니다. 서로 맞지 않으면 로드할 때 원인을 알려 주는 `InvalidDataException`이 납니다. enum 멤버가 바뀌어도 다시 가져와야 합니다.
+- **암호화:** AES-256과 HMAC 변조 검사를 씁니다. 키는 설정 에셋에 저장되므로 함께 커밋하세요.
+  - **한계:** 키가 앱에 들어가므로 가벼운 열람과 변조를 막는 수준입니다.
+- **asmdef 사용 시:** 게임이 asmdef를 쓰면 코드 폴더가 들어 있는 asmdef가 `Nyonyo.Framework`를 참조해야 합니다.
 
 ## 2D 공용 컴포넌트 (`Nyonyo.Framework.Gameplay`)
 
@@ -542,28 +690,90 @@ services.Register(new DebugConsole(Bootstrapper.Root));   // 에디터와 Develo
 static string AddGold(int amount = 1000) { Wallet.Gold += amount; return $"골드: {Wallet.Gold}"; }
 ```
 
-- **열고 닫기:** 게임 중 <code>`</code> 키로 엽니다. 모바일에서는 숨은 버튼 등에서 `DebugConsole.Instance.Toggle()`을 부르세요.
+- **열고 닫기:** 키보드가 있으면 <code>`</code> 키(`ToggleKey`)로 엽니다. 키보드가 없는 모바일에서는 손가락 세 개로 동시에 화면을 탭합니다(`ToggleTouchCount`, 0이면 끔). 코드에서는 `DebugConsole.Instance.Toggle()`을 부릅니다.
+- **IL2CPP 빌드:** `[DebugCommand]`는 `PreserveAttribute`를 상속하므로, Android, iOS, WebGL 빌드의 코드 제거에서도 명령 함수가 남습니다.
 - **명령 등록:** `[DebugCommand]`가 붙은 static 메서드는 자동으로 등록됩니다. 인자는 string, int, float, bool, enum 등을 쓸 수 있고, 기본값이 있으면 생략할 수 있습니다.
 - **기본 명령:** `help`, `clear`, `timescale <값>`, `scene <이름>`입니다.
+
+## 광고 (`Nyonyo.Framework.Ads`)
+
+게임 코드는 `IAdService`만 씁니다. 실제 광고 네트워크는 선택 패키지로 설치합니다(AdMob: `com.nyonyo.framework.admob`, 설치와 설정은 그 패키지의 README 참고).
+
+```csharp
+var ads = Services.Get<IAdService>();
+
+ads.ShowBanner();                                           // 초기화 전에 불러도 끝나면 보여 줌
+ads.ShowRewarded(onRewarded: () => coins += 100);           // 버튼 OnClick 등 await 없이
+if (await ads.ShowRewardedAsync()) coins += 100;            // async 함수 안에서
+ads.ShowInterstitial(onClosed: LoadNextStage);              // 광고가 없어도 onClosed는 호출됨
+rewardButton.interactable = ads.IsRewardedReady;
+
+ads.AdsRemoved = true;                                      // 광고 제거 구매 후. 보상형만 남음
+privacyButton.SetActive(ads.IsPrivacyOptionsRequired);      // 설정 화면 "개인정보 설정" 버튼
+await ads.ShowPrivacyOptionsAsync();
+
+ads.SkipNextAppOpen();                                      // 결제·공유 화면에 다녀오기 직전
+ads.RevenuePaid += revenue => Analytics.LogAdRevenue(revenue.Value, revenue.CurrencyCode);
+```
+
+| 구현 | 쓰는 곳 |
+|---|---|
+| `AdMobAdService` | Android, iOS (AdMob 패키지) |
+| `FakeAdService` | 에디터. 화면에 TEST 배너와 전체 화면 창을 띄우고, 보상 받기/건너뛰기를 골라 확인합니다. `SimulateNoFill`로 광고 없음도 확인합니다. |
+| `NullAdService` | WebGL, PC. 보상형 광고는 광고를 본 것으로 보고 바로 보상을 줍니다(기본값). 전면, 앱 오프닝, 배너는 나오지 않습니다. |
+
+- **웹과 PC의 보상형 광고:** 따로 설정하지 않아도, 광고가 없는 플랫폼 이용자는 보상 버튼을 누르면 바로 보상을 받습니다. 게임 코드는 모바일과 같습니다. 그 플랫폼에서 보상을 막으려면 `AdPolicy`의 **Reward Without Ad On Unsupported Platform**을 끄고, `IsRewardedReady`가 false인 보상 버튼을 숨기세요. 광고 열림/닫힘 이벤트는 그대로 발행되므로, 광고 시청 수를 분석에 남긴다면 플랫폼을 구분하세요.
+
+- **광고는 실패할 수 있습니다:** 모든 Show는 보여 줄 광고가 없으면 아무것도 하지 않고 false를 돌려줍니다. 광고가 없어도 게임이 멈추지 않게 짜세요.
+- **노출 규칙(`AdPolicy`):** 전면과 앱 오프닝 광고는 마지막 전체 화면 광고(보상형 포함)가 닫힌 뒤 `FullScreenCooldownSeconds`(기본 10초)가 지나야 다시 나옵니다. 전체 화면 광고는 한 번에 하나만 뜹니다. 앱이 백그라운드에서 돌아올 때 앱 오프닝 광고를 자동으로 띄우려면 `ShowAppOpenOnResume`을 켜세요(기본 꺼짐).
+- **광고 제거:** `AdsRemoved`는 SaveService를 넘기면 `ads.removed` 전역 키로 저장됩니다. 구매 복원 결과로 다시 설정하세요.
+- **배너 높이:** `BannerHeight`(화면 픽셀)만큼 UI를 올리면 배너에 가려지지 않습니다. 불러오기 전에는 0입니다.
+- **다른 광고 네트워크:** `AdServiceBase`를 상속해 불러오기와 띄우기(`IsLoaded`, `PresentAsync`, 배너 3개)만 구현하면 규칙과 이벤트는 그대로 쓸 수 있습니다.
 
 ## 에디터 도구
 
 | 메뉴 | 기능 |
 |---|---|
-| Tools > Nyonyo Framework > Create Settings | 부트스트랩 설정 파일 만들기 |
+| Tools > Nyonyo Framework > Settings > ... | 모든 설정 에셋(Framework, UI, Sound, UI Prefix, Game Data, AdMob)을 여는 곳입니다. 프로젝트에 있으면 선택하고, 없으면 기본 위치에 만듭니다. 설정 에셋은 Create 메뉴로 만들지 않습니다. |
 | Tools > Nyonyo Framework > Scene Switcher | 씬 목록 창. 클릭으로 열기, Play 버튼으로 바로 실행 |
 | Tools > Nyonyo Framework > Sound > Register Sounds to Addressables | 사운드 폴더를 Addressables에 등록 |
 | Tools > Create UI Script > Popup / UI | UI 스크립트 자동 생성 (아래 자동 매퍼) |
-| 데이터 테이블 우클릭 > Import CSV... / Reimport CSV | CSV 가져오기 |
+| Tools > Nyonyo Framework > Game Data > Import All | 모든 Game Data Settings의 구글 시트 가져오기 |
 
-## WebGL
+## 플랫폼 지원
 
-이 패키지의 런타임 코드는 WebGL에서 동작합니다. 스레드와 Task를 쓰지 않고 Unity `Awaitable`만 씁니다. 대신 아래 사항을 지켜 주세요.
+Android, iOS, WebGL, PC(Windows, macOS, Linux)를 모두 지원합니다. 스레드와 Task를 쓰지 않고 Unity `Awaitable`만 씁니다.
+
+### 공통
 
 | 항목 | 내용 |
 |---|---|
-| Addressables 동기 로드 | WebGL은 `WaitForCompletion`을 지원하지 않습니다. `PopupManager.Show`로 바로 띄울 Addressables 팝업은 `[Popup(Preload = true)]`로 두거나 `ShowAsync`를 쓰세요. 동기 로드를 시도하면 원인을 알려 주는 `NotSupportedException`이 납니다. 에디터의 빌드 대상이 WebGL이면 미리 경고합니다. |
-| 종료 처리 | 탭을 닫으면 `Application.quitting`이 호출되지 않습니다. 저장은 `Save` 호출 즉시 기록되고, 볼륨과 리바인딩도 바뀔 때 저장되므로 따로 처리할 필요는 없습니다. |
+| 화면 방향 | UI Settings 인스펙터의 **Player Settings에 적용**이 네 플랫폼을 한 번에 맞춥니다. 모바일은 회전 방향 제한, WebGL은 기본 캔버스 크기, PC는 창 크기(세로형은 창 모드로 시작)입니다. 창과 캔버스 크기는 기준 해상도의 절반입니다. |
+| 코드 제거(IL2CPP) | Android, iOS, WebGL 빌드는 쓰지 않는 코드를 지웁니다. 프레임워크가 리플렉션으로 찾는 `[Popup]`과 `[DebugCommand]`는 보존되도록 처리했습니다. 게임 코드에서 리플렉션으로만 쓰는 타입은 `[Preserve]`를 붙이세요. |
+| 앱 종료 | 모바일과 WebGL은 `Application.quitting` 없이 내려갈 수 있습니다. `Save`는 호출 즉시 기록되고, 볼륨은 포커스를 잃을 때도 저장됩니다. 게임에서 미뤄 둔 저장이 있다면 `Application.focusChanged`에서 저장하세요. |
+
+### Android, iOS
+
+| 항목 | 내용 |
+|---|---|
+| 안전 영역 | 노치와 홈 인디케이터는 `SafeAreaFitter`로 피합니다. |
+| 뒤로가기 | Android 뒤로가기는 ESC로 들어와 팝업을 닫습니다. iOS에는 뒤로가기가 없으니 화면 닫기 버튼을 두세요. |
+| 디버그 콘솔 | 손가락 세 개로 동시에 탭해서 엽니다. |
+| 저장 위치 | `Application.persistentDataPath/Saves`입니다. iOS는 이 폴더가 iCloud 백업에 포함됩니다. |
+
+### PC
+
+| 항목 | 내용 |
+|---|---|
+| 창 | 세로형은 창 모드(기준 해상도의 절반 크기)로, 가로형은 전체 화면으로 시작합니다. |
+| 뒤로가기 | ESC로 팝업을 닫습니다. |
+
+### WebGL
+
+| 항목 | 내용 |
+|---|---|
+| Addressables 동기 로드 | WebGL은 `WaitForCompletion`을 지원하지 않습니다. `PopupManager.Open`으로 바로 열 Addressables 팝업은 `[Popup(Preload = true)]`로 두거나 `OpenAsync`를 쓰세요. 동기 로드를 시도하면 원인을 알려 주는 `NotSupportedException`이 납니다. 에디터의 빌드 대상이 WebGL이면 미리 경고합니다. |
+| 종료 처리 | 탭을 닫으면 `Application.quitting`이 호출되지 않습니다. 저장은 `Save` 호출 즉시 기록되고, 볼륨은 바뀐 뒤 0.5초 또는 탭이 포커스를 잃을 때, 리바인딩은 바뀔 때 저장됩니다. |
 | 저장소 | 기본 저장소는 PlayerPrefs(브라우저 IndexedDB)이고, 전체 1MB 정도로 제한됩니다. |
 | 소리 | 브라우저 정책상 사용자가 처음 클릭하거나 키를 누르기 전에는 소리가 나지 않습니다. 타이틀 화면에서 "터치해서 시작" 같은 입력을 받은 뒤 BGM을 트세요. |
 | ESC 키 | 브라우저 전체 화면에서는 ESC가 전체 화면 해제에 먼저 쓰입니다. 뒤로가기 동작은 다른 키나 버튼으로도 열 수 있게 하세요. |
@@ -574,7 +784,7 @@ static string AddGold(int amount = 1000) { Wallet.Gold += amount; return $"골�
 
 ### 접두사 규칙
 
-규칙은 `UIPrefixSettings` 에셋에서 관리합니다. 처음 사용할 때 `Assets/Editor/UIPrefixSettings.asset`이 기본값으로 만들어지고, **Create > Nyonyo Framework > UI Prefix Settings**로 직접 만들 수도 있습니다.
+규칙은 `UIPrefixSettings` 에셋에서 관리합니다. 처음 사용할 때 `Assets/Editor/UIPrefixSettings.asset`이 기본값으로 만들어지고, **Tools > Nyonyo Framework > Settings > UI Prefix Settings**로 직접 만들 수도 있습니다.
 
 | 접두사 | 변수 타입 |
 |---|---|
@@ -589,7 +799,7 @@ static string AddGold(int amount = 1000) { Wallet.Gold += amount; return $"골�
 | `DRP_` | `TMP_Dropdown` |
 | `RT_` | `RectTransform` |
 | `GO_` | `GameObject` |
-| `UI_` | 오브젝트에 붙은 `UIBase` 하위 클래스(자식 UI) |
+| `UI_` | 오브젝트에 붙은 `UIView` 하위 클래스(자식 UI) |
 
 - **타입 이름:** 타입은 전체 이름(예: `UnityEngine.UI.Image`)으로 적습니다.
 - **접두사가 겹칠 때:** 여러 접두사가 맞으면 가장 긴 접두사를 씁니다.
@@ -600,7 +810,7 @@ static string AddGold(int amount = 1000) { Wallet.Gold += amount; return $"골�
 1. 프리팹을 구성하고 오브젝트 이름에 접두사를 붙입니다. 예: `IMG_A`, `TXT_B`, `BTN_Ok`.
 2. Project 창에서 프리팹을 선택하거나 프리팹 모드를 연 상태에서 메뉴를 실행합니다.
    - **Tools > Create UI Script > Popup**: `PopupBase`를 상속한 스크립트를 만듭니다.
-   - **Tools > Create UI Script > UI**: `UIBase`를 상속한 스크립트를 만듭니다. 팝업 안에서 쓰는 자식 UI용입니다.
+   - **Tools > Create UI Script > UI**: `UIView`를 상속한 스크립트를 만듭니다. 팝업 안에서 쓰는 자식 UI용입니다.
 3. 저장 위치를 고릅니다. 파일 이름은 프리팹 이름이 기본값이고, 파일 이름이 곧 클래스 이름이 됩니다.
 4. 컴파일이 끝나면 스크립트가 프리팹 루트에 자동으로 붙고, 오브젝트도 변수에 자동으로 연결됩니다.
 5. **Popup**으로 만들면 프리팹 위치에 맞는 `[Popup(Path, LoadType)]`도 자동으로 들어갑니다.
@@ -623,14 +833,14 @@ public class Test : PopupBase
 
 ### 2. 인스펙터 버튼
 
-`UIBase`를 상속한 컴포넌트의 인스펙터에 두 버튼이 나타납니다.
+`PopupBase`나 `UIView`를 상속한 컴포넌트의 인스펙터에 두 버튼이 나타납니다.
 
 | 버튼 | 동작 |
 |---|---|
-| **Generate Script** | 현재 자식 오브젝트로 `#region Auto Generated UI` 영역만 다시 씁니다. 영역 밖에 직접 쓴 코드는 그대로 남습니다. 스크립트가 바뀌면 컴파일 후 자동으로 연결합니다. |
+| **Generate Script** | 현재 자식 오브젝트로 `#region Auto Generated UI` 영역만 다시 씁니다. 영역 밖에 직접 쓴 코드는 그대로 남습니다. 스크립트가 바뀌면 컴파일 후 자동으로 연결합니다. 새 스크립트를 만들 때는 `OnButtonClick`에 `BTN_` 버튼마다 `if (button == BTN_X)` / `else if` 분기를 넣어 줍니다. |
 | **Assign Object** | 접두사 오브젝트를 같은 이름의 변수에 연결합니다. `BTN_` 버튼은 OnClick에 `OnButtonEvent`도 연결합니다. 이미 연결된 것은 다시 추가하지 않습니다. |
 
-- **자식 UI:** 자식 오브젝트에 다른 `UIBase`가 붙어 있으면 그 자식까지만 포함합니다. 그 아래 오브젝트는 자식 UI의 스크립트가 관리합니다.
+- **자식 UI:** 자식 오브젝트에 `UIView`가 붙어 있으면 그 자식까지만 포함합니다. 그 아래 오브젝트는 자식 UI의 스크립트가 관리합니다.
 - **오브젝트 이름:** 오브젝트 이름이 곧 변수 이름입니다. 같은 UI 안에서 이름이 겹치면 첫 번째만 쓰고 경고를 띄웁니다.
 - **어셈블리 참조:** 스크립트를 asmdef가 있는 폴더에 저장한다면, 그 asmdef가 `Nyonyo.Framework`, `UnityEngine.UI`, `Unity.TextMeshPro`를 참조해야 합니다.
 

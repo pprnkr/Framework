@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 namespace Nyonyo.Framework.Tests
 {
-    public class TestMappedUI : UIBase
+    public class TestMappedUI : UIView
     {
         #region Auto Generated UI
         #pragma warning disable CS0169, CS0649

@@ -9,9 +9,9 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class PoolManagerTests
     {
-        GameObject _parent;
-        GameObject _prefab;
-        PoolManager _pools;
+        private GameObject _parent;
+        private GameObject _prefab;
+        private PoolManager _pools;
 
         [SetUp]
         public void SetUp()

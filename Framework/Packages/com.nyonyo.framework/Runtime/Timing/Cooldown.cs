@@ -20,8 +20,8 @@ namespace Nyonyo.Framework.Timing
     /// </example>
     public sealed class Cooldown
     {
-        readonly Func<double> _clock;
-        double _readyAt;
+        private readonly Func<double> _clock;
+        private double _readyAt;
 
         /// <param name="duration">대기시간(초)입니다.</param>
         /// <param name="unscaledTime">true면 <c>Time.timeScale</c>의 영향을 받지 않습니다.</param>

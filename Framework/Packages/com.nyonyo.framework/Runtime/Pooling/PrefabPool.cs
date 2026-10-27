@@ -9,9 +9,9 @@ namespace Nyonyo.Framework.Pooling
     /// </summary>
     public sealed class PrefabPool
     {
-        readonly GameObject _prefab;
-        readonly Transform _container;
-        readonly Stack<PooledObject> _inactive = new();
+        private readonly GameObject _prefab;
+        private readonly Transform _container;
+        private readonly Stack<PooledObject> _inactive = new();
 
         /// <param name="prefab">재사용할 프리팹입니다.</param>
         /// <param name="container">쉬고 있는 인스턴스를 모아 둘 부모입니다.</param>
@@ -119,7 +119,7 @@ namespace Nyonyo.Framework.Pooling
                 CountActive--;
         }
 
-        PooledObject PopInactive()
+        private PooledObject PopInactive()
         {
             // 풀을 거치지 않고 파괴된 인스턴스는 건너뜁니다.
             while (_inactive.Count > 0)
@@ -132,7 +132,7 @@ namespace Nyonyo.Framework.Pooling
             return null;
         }
 
-        PooledObject Create()
+        private PooledObject Create()
         {
             var instance = Object.Instantiate(_prefab, _container, false);
             instance.name = _prefab.name;
@@ -145,7 +145,7 @@ namespace Nyonyo.Framework.Pooling
             return pooled;
         }
 
-        static void DestroyObject(GameObject instance)
+        private void DestroyObject(GameObject instance)
         {
             if (Application.isPlaying)
                 Object.Destroy(instance);

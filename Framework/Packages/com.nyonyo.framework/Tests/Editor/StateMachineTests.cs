@@ -7,17 +7,17 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class StateMachineTests
     {
-        enum State
+        private enum State
         {
             Idle,
             Run,
             Jump,
         }
 
-        class RecordingState : IState
+        private class RecordingState : IState
         {
-            readonly List<string> _log;
-            readonly string _name;
+            private readonly List<string> _log;
+            private readonly string _name;
 
             public RecordingState(string name, List<string> log)
             {
@@ -32,8 +32,8 @@ namespace Nyonyo.Framework.Editor.Tests
             public void Exit() => _log.Add($"exit:{_name}");
         }
 
-        List<string> _log;
-        StateMachine<State> _fsm;
+        private List<string> _log;
+        private StateMachine<State> _fsm;
 
         [SetUp]
         public void SetUp()

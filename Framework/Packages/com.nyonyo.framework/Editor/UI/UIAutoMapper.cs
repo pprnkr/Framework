@@ -17,10 +17,10 @@ namespace Nyonyo.Framework.Editor.UI
     /// </summary>
     public static class UIAutoMapper
     {
-        const string PendingKey = "Nyonyo.Framework.UIAutoMapper.Pending";
+        private const string PendingKey = "Nyonyo.Framework.UIAutoMapper.Pending";
 
         [Serializable]
-        class PendingMapping
+        private class PendingMapping
         {
             public string PrefabPath;
             public string ScriptPath;
@@ -138,7 +138,7 @@ namespace Nyonyo.Framework.Editor.UI
         }
 
         [DidReloadScripts]
-        static void OnScriptsReloaded()
+        private static void OnScriptsReloaded()
         {
             var json = SessionState.GetString(PendingKey, "");
             if (string.IsNullOrEmpty(json))
@@ -158,7 +158,7 @@ namespace Nyonyo.Framework.Editor.UI
             EditorApplication.delayCall += () => ApplyToPrefab(pending.PrefabPath, type, pending.AddComponent);
         }
 
-        static void ApplyToPrefab(string prefabPath, Type componentType, bool addComponent)
+        private static void ApplyToPrefab(string prefabPath, Type componentType, bool addComponent)
         {
             var stage = PrefabStageUtility.GetCurrentPrefabStage();
             if (stage != null && stage.assetPath == prefabPath)
@@ -189,7 +189,7 @@ namespace Nyonyo.Framework.Editor.UI
             }
         }
 
-        static UIBase GetOrAddComponent(GameObject root, Type componentType, bool addComponent)
+        private static UIBase GetOrAddComponent(GameObject root, Type componentType, bool addComponent)
         {
             var component = root.GetComponent(componentType) as UIBase;
             if (component == null && addComponent)
@@ -213,7 +213,7 @@ namespace Nyonyo.Framework.Editor.UI
             return PrefabUtility.IsPartOfPrefabAsset(target) ? AssetDatabase.GetAssetPath(target) : null;
         }
 
-        static bool BindClick(UIBase target, Button button)
+        private static bool BindClick(UIBase target, Button button)
         {
             var onClick = button.onClick;
             for (var i = 0; i < onClick.GetPersistentEventCount(); i++)
@@ -228,7 +228,7 @@ namespace Nyonyo.Framework.Editor.UI
             return true;
         }
 
-        static FieldInfo FindField(Type type, string name)
+        private static FieldInfo FindField(Type type, string name)
         {
             const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
             for (var current = type; current != null; current = current.BaseType)
@@ -241,7 +241,7 @@ namespace Nyonyo.Framework.Editor.UI
             return null;
         }
 
-        static void MarkDirty(UIBase target)
+        private static void MarkDirty(UIBase target)
         {
             EditorUtility.SetDirty(target);
             var stage = PrefabStageUtility.GetPrefabStage(target.gameObject);

@@ -8,7 +8,7 @@ namespace Nyonyo.Framework.Pooling
     [DisallowMultipleComponent]
     public sealed class PooledObject : MonoBehaviour
     {
-        IPoolable[] _poolables;
+        private IPoolable[] _poolables;
 
         internal PrefabPool Pool { get; set; }
 
@@ -41,6 +41,6 @@ namespace Nyonyo.Framework.Pooling
         }
 
         // 씬과 함께 파괴되는 등 풀을 거치지 않고 사라지면 풀의 개수 기록을 맞춥니다.
-        void OnDestroy() => Pool?.OnInstanceDestroyed(this);
+        private void OnDestroy() => Pool?.OnInstanceDestroyed(this);
     }
 }

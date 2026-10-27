@@ -12,7 +12,7 @@ namespace Nyonyo.Framework.Debugging
     /// </summary>
     public sealed class DebugCommandRegistry
     {
-        sealed class Command
+        private sealed class Command
         {
             public string Name;
             public string Description;
@@ -20,7 +20,7 @@ namespace Nyonyo.Framework.Debugging
             public Func<string[], string> Handler;
         }
 
-        readonly Dictionary<string, Command> _commands = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Command> _commands = new(StringComparer.OrdinalIgnoreCase);
 
         public DebugCommandRegistry()
         {
@@ -117,7 +117,7 @@ namespace Nyonyo.Framework.Debugging
         /// <summary>
         /// 공백으로 인자를 나눕니다. 큰따옴표로 감싸면 공백이 들어간 인자를 하나로 씁니다.
         /// </summary>
-        public static string[] Tokenize(string line)
+        internal string[] Tokenize(string line)
         {
             var tokens = new List<string>();
             if (string.IsNullOrEmpty(line))
@@ -152,7 +152,7 @@ namespace Nyonyo.Framework.Debugging
             return tokens.ToArray();
         }
 
-        string Help()
+        private string Help()
         {
             var builder = new StringBuilder();
             foreach (var name in Names)
@@ -167,7 +167,7 @@ namespace Nyonyo.Framework.Debugging
             return builder.ToString().TrimEnd();
         }
 
-        static Func<string[], string> CreateHandler(MethodInfo method)
+        private Func<string[], string> CreateHandler(MethodInfo method)
         {
             var parameters = method.GetParameters();
             if (parameters.Length == 1 && parameters[0].ParameterType == typeof(string[]))
@@ -190,9 +190,9 @@ namespace Nyonyo.Framework.Debugging
             };
         }
 
-        static string Format(object result) => result?.ToString();
+        private string Format(object result) => result?.ToString();
 
-        static object Convert(string value, Type type)
+        private object Convert(string value, Type type)
         {
             var culture = CultureInfo.InvariantCulture;
             if (type == typeof(string))
@@ -213,7 +213,7 @@ namespace Nyonyo.Framework.Debugging
             throw new ArgumentException($"{type.Name} 타입 인자는 지원하지 않습니다.");
         }
 
-        static string Usage(string name, MethodInfo method)
+        private string Usage(string name, MethodInfo method)
         {
             var parameters = method.GetParameters();
             if (parameters.Length == 1 && parameters[0].ParameterType == typeof(string[]))
@@ -230,7 +230,7 @@ namespace Nyonyo.Framework.Debugging
             return builder.ToString();
         }
 
-        static string TypeName(Type type)
+        private string TypeName(Type type)
         {
             if (type == typeof(int)) return "int";
             if (type == typeof(long)) return "long";

@@ -12,21 +12,21 @@ namespace Nyonyo.Framework.Gameplay
     /// </remarks>
     public sealed class SpriteFlash : MonoBehaviour
     {
-        [SerializeField] Color _color = new(1f, 0.35f, 0.35f, 1f);
+        [SerializeField] private Color _color = new(1f, 0.35f, 0.35f, 1f);
 
         [Min(0f)]
-        [SerializeField] float _duration = 0.1f;
+        [SerializeField] private float _duration = 0.1f;
 
         [Tooltip("같은 오브젝트의 Health가 피해를 받으면 자동으로 깜빡입니다.")]
-        [SerializeField] bool _flashOnDamage = true;
+        [SerializeField] private bool _flashOnDamage = true;
 
-        SpriteRenderer[] _renderers = Array.Empty<SpriteRenderer>();
-        Color[] _originalColors = Array.Empty<Color>();
-        Health _health;
-        int _flashId;
-        bool _flashing;
+        private SpriteRenderer[] _renderers = Array.Empty<SpriteRenderer>();
+        private Color[] _originalColors = Array.Empty<Color>();
+        private Health _health;
+        private int _flashId;
+        private bool _flashing;
 
-        void Awake()
+        private void Awake()
         {
             _renderers = GetComponentsInChildren<SpriteRenderer>(true);
             _originalColors = new Color[_renderers.Length];
@@ -34,20 +34,20 @@ namespace Nyonyo.Framework.Gameplay
                 _health.Damaged += OnDamaged;
         }
 
-        void OnDestroy()
+        private void OnDestroy()
         {
             if (_health != null)
                 _health.Damaged -= OnDamaged;
         }
 
         // 풀에 돌아가거나 꺼질 때 색이 바뀐 채로 남지 않게 합니다.
-        void OnDisable() => Restore();
+        private void OnDisable() => Restore();
 
         public void Flash() => Flash(_color, _duration);
 
-        public void Flash(Color color, float duration) => _ = FlashAsync(color, duration);
+        public void Flash(Color color, float duration) => FlashAsync(color, duration).Forget();
 
-        async Awaitable FlashAsync(Color color, float duration)
+        private async Awaitable FlashAsync(Color color, float duration)
         {
             if (!_flashing)
             {
@@ -75,7 +75,7 @@ namespace Nyonyo.Framework.Gameplay
                 Restore();
         }
 
-        void Restore()
+        private void Restore()
         {
             if (!_flashing)
                 return;
@@ -88,6 +88,6 @@ namespace Nyonyo.Framework.Gameplay
             }
         }
 
-        void OnDamaged(DamageInfo info) => Flash();
+        private void OnDamaged(DamageInfo info) => Flash();
     }
 }

@@ -17,22 +17,22 @@ namespace Nyonyo.Framework.Editor.UI
     /// </summary>
     static class UIScriptMenu
     {
-        const string MenuRoot = "Tools/Create UI Script/";
-        const string LastFolderKey = "Nyonyo.Framework.UIScriptMenu.LastFolder";
+        private const string MenuRoot = "Tools/Create UI Script/";
+        private const string LastFolderKey = "Nyonyo.Framework.UIScriptMenu.LastFolder";
 
-        static readonly Regex s_identifier = new("^[A-Za-z_][A-Za-z0-9_]*$");
+        private static readonly Regex s_identifier = new("^[A-Za-z_][A-Za-z0-9_]*$");
 
         [MenuItem(MenuRoot + "Popup")]
-        static void CreatePopupScript() => CreateScript(typeof(PopupBase));
+        private static void CreatePopupScript() => CreateScript(typeof(PopupBase));
 
         [MenuItem(MenuRoot + "UI")]
-        static void CreateUIScript() => CreateScript(typeof(UIBase));
+        private static void CreateUIScript() => CreateScript(typeof(UIView));
 
         [MenuItem(MenuRoot + "Popup", true)]
         [MenuItem(MenuRoot + "UI", true)]
-        static bool CanCreateScript() => TryGetTargetPrefab(out _, out _);
+        private static bool CanCreateScript() => TryGetTargetPrefab(out _, out _);
 
-        static void CreateScript(Type baseType)
+        private static void CreateScript(Type baseType)
         {
             if (!TryGetTargetPrefab(out var prefabPath, out var root))
             {
@@ -95,7 +95,7 @@ namespace Nyonyo.Framework.Editor.UI
             Debug.Log($"[Nyonyo Framework] {scriptPath}을(를) 만들었습니다(필드 {bindings.Count}개). 컴파일이 끝나면 {root.name} 프리팹에 붙이고 연결합니다.");
         }
 
-        static bool TryGetTargetPrefab(out string prefabPath, out GameObject root)
+        private static bool TryGetTargetPrefab(out string prefabPath, out GameObject root)
         {
             var stage = PrefabStageUtility.GetCurrentPrefabStage();
             if (stage != null)

@@ -13,18 +13,19 @@ namespace Nyonyo.Framework.Editor.Scenes
     /// </summary>
     sealed class SceneSwitcherWindow : EditorWindow
     {
-        Vector2 _scroll;
-        string _filter = "";
-        List<string> _projectScenes;
+        private Vector2 _scroll;
+        private string _filter = "";
+        private List<string> _projectScenes;
 
+        // [MenuItem] 함수는 Unity가 static만 허용합니다.
         [MenuItem("Tools/Nyonyo Framework/Scene Switcher")]
-        static void Open() => GetWindow<SceneSwitcherWindow>("Scene Switcher");
+        private static void Open() => GetWindow<SceneSwitcherWindow>("Scene Switcher");
 
-        void OnEnable() => Refresh();
+        private void OnEnable() => Refresh();
 
-        void OnProjectChange() => Refresh();
+        private void OnProjectChange() => Refresh();
 
-        void Refresh()
+        private void Refresh()
         {
             _projectScenes = AssetDatabase.FindAssets("t:Scene", new[] { "Assets" })
                 .Select(AssetDatabase.GUIDToAssetPath)
@@ -33,7 +34,7 @@ namespace Nyonyo.Framework.Editor.Scenes
             Repaint();
         }
 
-        void OnGUI()
+        private void OnGUI()
         {
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar))
             {
@@ -59,7 +60,7 @@ namespace Nyonyo.Framework.Editor.Scenes
             EditorGUILayout.EndScrollView();
         }
 
-        void DrawScene(string path)
+        private void DrawScene(string path)
         {
             var sceneName = Path.GetFileNameWithoutExtension(path);
             if (_filter.Length > 0 && sceneName.IndexOf(_filter, System.StringComparison.OrdinalIgnoreCase) < 0)
@@ -82,7 +83,7 @@ namespace Nyonyo.Framework.Editor.Scenes
             }
         }
 
-        static bool OpenScene(string path)
+        private bool OpenScene(string path)
         {
             if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 return false;

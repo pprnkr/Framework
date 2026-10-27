@@ -14,13 +14,13 @@ namespace Nyonyo.Framework.Gameplay
     public sealed class DamageDealer2D : MonoBehaviour
     {
         [Tooltip("한 번에 주는 피해량입니다.")]
-        [SerializeField] float _damage = 10f;
+        [SerializeField] private float _damage = 10f;
 
         [Tooltip("피해를 줄 레이어입니다.")]
-        [SerializeField] LayerMask _targetLayers = ~0;
+        [SerializeField] private LayerMask _targetLayers = ~0;
 
         [Tooltip("피해를 준 뒤 이 오브젝트를 없앱니다(풀링된 오브젝트면 풀에 반환). 총알에 씁니다.")]
-        [SerializeField] bool _removeOnHit = false;
+        [SerializeField] private bool _removeOnHit = false;
 
         public float Damage
         {
@@ -31,9 +31,9 @@ namespace Nyonyo.Framework.Gameplay
         /// <summary>피해를 준 뒤(대상) 호출됩니다.</summary>
         public event Action<Health> Hit;
 
-        void OnTriggerEnter2D(Collider2D other) => TryHit(other.gameObject);
+        private void OnTriggerEnter2D(Collider2D other) => TryHit(other.gameObject);
 
-        void OnCollisionEnter2D(Collision2D collision) => TryHit(collision.gameObject);
+        private void OnCollisionEnter2D(Collision2D collision) => TryHit(collision.gameObject);
 
         /// <summary>
         /// <paramref name="target"/>에 피해를 줍니다. 레이어가 맞지 않거나 Health가 없거나 피해가 무시되면 false입니다.
@@ -56,7 +56,7 @@ namespace Nyonyo.Framework.Gameplay
             return true;
         }
 
-        void Remove()
+        private void Remove()
         {
             if (Services.TryGet(out PoolManager pools))
                 pools.Despawn(gameObject);

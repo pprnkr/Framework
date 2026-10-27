@@ -14,16 +14,16 @@ namespace Nyonyo.Framework.Gameplay
     public sealed class GroundCheck2D : MonoBehaviour
     {
         [Tooltip("확인 영역의 중심(오브젝트 기준)입니다.")]
-        [SerializeField] Vector2 _offset = new(0f, -0.5f);
+        [SerializeField] private Vector2 _offset = new(0f, -0.5f);
 
         [Tooltip("확인 영역의 크기입니다.")]
-        [SerializeField] Vector2 _size = new(0.8f, 0.1f);
+        [SerializeField] private Vector2 _size = new(0.8f, 0.1f);
 
         [Tooltip("땅으로 볼 레이어입니다.")]
-        [SerializeField] LayerMask _groundLayers = 1;
+        [SerializeField] private LayerMask _groundLayers = 1;
 
-        readonly List<Collider2D> _hits = new();
-        ContactFilter2D _filter;
+        private readonly List<Collider2D> _hits = new();
+        private ContactFilter2D _filter;
 
         public bool IsGrounded { get; private set; }
 
@@ -33,13 +33,13 @@ namespace Nyonyo.Framework.Gameplay
         /// <summary>땅에서 떨어진 순간 호출됩니다.</summary>
         public event Action LeftGround;
 
-        void Awake()
+        private void Awake()
         {
             _filter = new ContactFilter2D { useTriggers = false };
             _filter.SetLayerMask(_groundLayers);
         }
 
-        void FixedUpdate() => SetGrounded(Check());
+        private void FixedUpdate() => SetGrounded(Check());
 
         /// <summary>
         /// 지금 땅에 닿아 있는지 바로 확인합니다. 결과는 <see cref="IsGrounded"/>에 반영하지 않습니다.
@@ -57,7 +57,7 @@ namespace Nyonyo.Framework.Gameplay
             return false;
         }
 
-        void SetGrounded(bool grounded)
+        private void SetGrounded(bool grounded)
         {
             if (grounded == IsGrounded)
                 return;
@@ -69,7 +69,7 @@ namespace Nyonyo.Framework.Gameplay
                 LeftGround?.Invoke();
         }
 
-        void OnDrawGizmosSelected()
+        private void OnDrawGizmosSelected()
         {
             Gizmos.color = IsGrounded ? Color.green : Color.red;
             Gizmos.DrawWireCube((Vector2)transform.position + _offset, _size);

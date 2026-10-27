@@ -1,5 +1,15 @@
 {
   "dependencies": {
+    "com.google.ads.mobile": {
+      "version": "11.6.0",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.external-dependency-manager": "2.1.0",
+        "com.unity.modules.androidjni": "1.0.0"
+      },
+      "url": "https://package.openupm.com"
+    },
     "com.nyonyo.framework": {
       "version": "file:com.nyonyo.framework",
       "depth": 0,
@@ -7,6 +17,15 @@
       "dependencies": {
         "com.unity.ugui": "2.0.0",
         "com.unity.addressables": "4.1.1"
+      }
+    },
+    "com.nyonyo.framework.admob": {
+      "version": "file:com.nyonyo.framework.admob",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.nyonyo.framework": "0.1.0",
+        "com.google.ads.mobile": "11.6.0"
       }
     },
     "com.unity.2d.animation": {
@@ -159,6 +178,15 @@
       "depth": 1,
       "source": "builtin",
       "dependencies": {}
+    },
+    "com.unity.external-dependency-manager": {
+      "version": "2.1.0",
+      "depth": 2,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.uielements": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
     },
     "com.unity.ide.rider": {
       "version": "3.1.0",

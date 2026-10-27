@@ -19,7 +19,13 @@ namespace Nyonyo.Framework.Scenes
         float Progress { get; }
 
         /// <summary>
-        /// 현재 씬을 내리고 <paramref name="sceneName"/> 씬을 불러옵니다.
+        /// 현재 씬을 내리고 <paramref name="sceneName"/> 씬을 불러옵니다. 전환은 내부에서 진행되므로 기다릴 필요가 없습니다.
+        /// 이미 전환 중이면 요청을 무시합니다. 끝날 때까지 기다리거나 결과가 필요하면 <see cref="LoadAsync"/>를 쓰세요.
+        /// </summary>
+        void Load(string sceneName);
+
+        /// <summary>
+        /// <see cref="Load"/>와 같고, 전환이 끝날 때까지 기다릴 수 있습니다.
         /// 이미 전환 중이면 요청을 무시하고 false를 반환합니다.
         /// </summary>
         /// <remarks>

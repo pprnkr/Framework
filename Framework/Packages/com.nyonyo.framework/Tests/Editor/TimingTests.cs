@@ -11,8 +11,8 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class TimingTests
     {
-        TimerService _timers;
-        List<string> _log;
+        private TimerService _timers;
+        private List<string> _log;
 
         [SetUp]
         public void SetUp()

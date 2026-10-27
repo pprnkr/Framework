@@ -14,8 +14,8 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class UIAutoMapperTests
     {
-        GameObject _root;
-        UIPrefixSettings _settings;
+        private GameObject _root;
+        private UIPrefixSettings _settings;
 
         [SetUp]
         public void SetUp()
@@ -39,7 +39,7 @@ namespace Nyonyo.Framework.Editor.Tests
             Object.DestroyImmediate(_settings);
         }
 
-        GameObject Add(string name, Transform parent = null, params System.Type[] components)
+        private GameObject Add(string name, Transform parent = null, params System.Type[] components)
         {
             var go = new GameObject(name, typeof(RectTransform));
             foreach (var component in components)
@@ -48,7 +48,7 @@ namespace Nyonyo.Framework.Editor.Tests
             return go;
         }
 
-        void BuildMappedHierarchy()
+        private void BuildMappedHierarchy()
         {
             var panel = Add("RT_Panel", null, typeof(Image));
             Add("IMG_Icon", panel.transform, typeof(Image));
@@ -143,9 +143,11 @@ namespace Nyonyo.Framework.Editor.Tests
             StringAssert.Contains("public class Test : PopupBase", code);
             StringAssert.Contains("#region Auto Generated UI", code);
             StringAssert.Contains("[SerializeField] private Image IMG_A;", code);
-            StringAssert.Contains("protected override void OnOpen()", code);
-            StringAssert.Contains("public override void OnButtonEvent(Button button)", code);
-            StringAssert.Contains("case \"BTN_Ok\":", code);
+            StringAssert.Contains("protected override void PostOpen()", code);
+            StringAssert.Contains("protected override void OnButtonClick(Button button)", code);
+            StringAssert.Contains("if (button == BTN_Ok)", code);
+            StringAssert.DoesNotContain("switch", code);
+            StringAssert.DoesNotContain("button.name", code);
             StringAssert.DoesNotContain("namespace", code);
         }
 
@@ -178,13 +180,13 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
-        public void CreateScript_UIBaseWithNamespace_WrapsClassAndSkipsOnOpen()
+        public void CreateScript_UIViewWithNamespace_WrapsClassAndSkipsPostOpen()
         {
-            var code = UIScriptGenerator.CreateScript("Inventory", typeof(UIBase), "MyGame.UI", new List<UIBinding>());
+            var code = UIScriptGenerator.CreateScript("Inventory", typeof(UIView), "MyGame.UI", new List<UIBinding>());
 
             StringAssert.Contains("namespace MyGame.UI", code);
-            StringAssert.Contains("    public class Inventory : UIBase", code);
-            StringAssert.DoesNotContain("OnOpen", code);
+            StringAssert.Contains("    public class Inventory : UIView", code);
+            StringAssert.DoesNotContain("PostOpen", code);
         }
 
         [Test]
@@ -218,7 +220,7 @@ namespace Nyonyo.Framework.Editor.Tests
             const string source =
                 "using UnityEngine;\r\n" +
                 "\r\n" +
-                "public class Test : UIBase\r\n" +
+                "public class Test : UIView\r\n" +
                 "{\r\n" +
                 "    void MyCode() { }\r\n" +
                 "}\r\n";
@@ -241,7 +243,7 @@ namespace Nyonyo.Framework.Editor.Tests
         public void UpdateScript_SameBindings_ReturnsSameText()
         {
             var bindings = new List<UIBinding> { new("IMG_A", typeof(Image), null) };
-            var source = UIScriptGenerator.CreateScript("Test", typeof(UIBase), "", bindings);
+            var source = UIScriptGenerator.CreateScript("Test", typeof(UIView), "", bindings);
 
             Assert.AreEqual(source, UIScriptGenerator.UpdateScript(source, "Test", bindings));
         }

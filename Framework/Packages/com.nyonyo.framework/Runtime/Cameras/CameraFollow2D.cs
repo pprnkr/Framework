@@ -15,29 +15,29 @@ namespace Nyonyo.Framework.Cameras
     public sealed class CameraFollow2D : MonoBehaviour
     {
         [Tooltip("따라갈 대상입니다.")]
-        [SerializeField] Transform _target;
+        [SerializeField] private Transform _target;
 
         [Tooltip("대상 위치에서 카메라를 얼마나 떨어뜨릴지입니다.")]
-        [SerializeField] Vector2 _offset = Vector2.zero;
+        [SerializeField] private Vector2 _offset = Vector2.zero;
 
         [Tooltip("목표 위치까지 걸리는 대략적인 시간(초)입니다. 0이면 바로 붙어 다닙니다.")]
         [Min(0f)]
-        [SerializeField] float _smoothTime = 0.15f;
+        [SerializeField] private float _smoothTime = 0.15f;
 
         [Tooltip("대상이 이 크기(카메라 중심 기준) 안에서 움직이면 카메라가 따라가지 않습니다.")]
-        [SerializeField] Vector2 _deadZone = Vector2.zero;
+        [SerializeField] private Vector2 _deadZone = Vector2.zero;
 
         [Tooltip("카메라가 비출 수 있는 영역입니다. 비워 두면 제한하지 않습니다.")]
-        [SerializeField] Collider2D _boundsCollider;
+        [SerializeField] private Collider2D _boundsCollider;
 
         [Tooltip("true면 일시정지(timeScale 0) 중에도 따라갑니다.")]
-        [SerializeField] bool _unscaledTime = false;
+        [SerializeField] private bool _unscaledTime = false;
 
-        Camera _camera;
-        Vector2 _position;
-        Vector2 _velocity;
-        Rect? _bounds;
-        bool _hasPosition;
+        private Camera _camera;
+        private Vector2 _position;
+        private Vector2 _velocity;
+        private Rect? _bounds;
+        private bool _hasPosition;
 
         public Transform Target
         {
@@ -45,7 +45,7 @@ namespace Nyonyo.Framework.Cameras
             set => _target = value;
         }
 
-        void Awake() => _camera = GetComponent<Camera>();
+        private void Awake() => _camera = GetComponent<Camera>();
 
         /// <summary>
         /// 카메라가 비출 수 있는 영역을 정합니다. 인스펙터의 Bounds Collider보다 우선합니다.
@@ -72,7 +72,7 @@ namespace Nyonyo.Framework.Cameras
             Apply();
         }
 
-        void LateUpdate()
+        private void LateUpdate()
         {
             if (_target == null)
                 return;
@@ -92,7 +92,7 @@ namespace Nyonyo.Framework.Cameras
             Apply();
         }
 
-        Vector2 Clamp(Vector2 position)
+        private Vector2 Clamp(Vector2 position)
         {
             var bounds = _bounds ?? (_boundsCollider != null ? ToRect(_boundsCollider.bounds) : (Rect?)null);
             return bounds.HasValue && _camera != null && _camera.orthographic
@@ -101,8 +101,8 @@ namespace Nyonyo.Framework.Cameras
         }
 
         // 따라간 위치는 따로 기억해 두고 매번 덮어써서, 흔들림 오프셋이 쌓이지 않게 합니다.
-        void Apply() => transform.position = new Vector3(_position.x, _position.y, transform.position.z);
+        private void Apply() => transform.position = new Vector3(_position.x, _position.y, transform.position.z);
 
-        static Rect ToRect(Bounds bounds) => new(bounds.min.x, bounds.min.y, bounds.size.x, bounds.size.y);
+        private Rect ToRect(Bounds bounds) => new(bounds.min.x, bounds.min.y, bounds.size.x, bounds.size.y);
     }
 }

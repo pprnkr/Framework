@@ -15,11 +15,11 @@ namespace Nyonyo.Framework.Scenes
     /// </remarks>
     public sealed class SceneService : ISceneService, IDisposable
     {
-        readonly ISceneTransition _transition;
-        readonly IEventBus _eventBus;
-        readonly ISceneLoader _loader;
-        readonly Action<float> _reportProgress;
-        readonly CancellationTokenSource _disposeCts = new();
+        private readonly ISceneTransition _transition;
+        private readonly IEventBus _eventBus;
+        private readonly ISceneLoader _loader;
+        private readonly Action<float> _reportProgress;
+        private readonly CancellationTokenSource _disposeCts = new();
 
         /// <param name="transition">전환 연출입니다. null이면 연출 없이 바로 전환합니다.</param>
         /// <param name="eventBus">씬 전환 이벤트를 발행할 버스입니다. null이면 이벤트를 발행하지 않습니다.</param>
@@ -40,6 +40,8 @@ namespace Nyonyo.Framework.Scenes
         /// 로드가 너무 빨리 끝나 화면이 번쩍이지 않도록, 화면을 가린 상태를 최소한 이 시간(초)만큼 유지합니다.
         /// </summary>
         public float MinimumLoadingSeconds { get; set; }
+
+        public void Load(string sceneName) => LoadAsync(sceneName).Forget();
 
         public async Awaitable<bool> LoadAsync(string sceneName, CancellationToken cancellationToken = default)
         {
@@ -86,7 +88,7 @@ namespace Nyonyo.Framework.Scenes
 
         public void Dispose() => _disposeCts.Cancel();
 
-        void ReportProgress(float progress)
+        private void ReportProgress(float progress)
         {
             Progress = progress;
             _transition?.SetProgress(progress);

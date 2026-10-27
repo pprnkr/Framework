@@ -15,12 +15,12 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class PopupManagerTests
     {
-        GameObject _parent;
-        EventBus _eventBus;
-        PopupManager _manager;
-        TestPopupA _prefabA;
-        TestPopupB _prefabB;
-        readonly List<Object> _cleanup = new();
+        private GameObject _parent;
+        private EventBus _eventBus;
+        private PopupManager _manager;
+        private TestPopupA _prefabA;
+        private TestPopupB _prefabB;
+        private readonly List<Object> _cleanup = new();
 
         [SetUp]
         public void SetUp()
@@ -52,14 +52,14 @@ namespace Nyonyo.Framework.Editor.Tests
             _cleanup.Clear();
         }
 
-        T CreateTemplate<T>(string name) where T : PopupBase
+        private T CreateTemplate<T>(string name) where T : PopupBase
         {
             var go = new GameObject(name, typeof(RectTransform));
             _cleanup.Add(go);
             return go.AddComponent<T>();
         }
 
-        static void SetSerialized(Object target, string propertyName, Action<SerializedProperty> set)
+        private void SetSerialized(Object target, string propertyName, Action<SerializedProperty> set)
         {
             var serializedObject = new SerializedObject(target);
             set(serializedObject.FindProperty(propertyName));
@@ -89,19 +89,19 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
-        public void Show_PlacesPopupOnPrefabLayer_AndCallsOnOpen()
+        public void Open_PlacesPopupOnPrefabLayer_AndCallsOpenHooks()
         {
-            var popup = _manager.Show<TestPopupA>();
+            var popup = _manager.Open<TestPopupA>();
 
             Assert.AreEqual(_manager.GetLayerRoot(UILayer.Popup), popup.transform.parent);
             Assert.AreEqual(UILayer.Popup, popup.Layer);
-            CollectionAssert.AreEqual(new[] { "open" }, popup.Log);
+            CollectionAssert.AreEqual(new[] { "prev open", "post open" }, popup.Log);
         }
 
         [Test]
         public void Show_WithLayer_UsesGivenLayer()
         {
-            var popup = _manager.Show<TestPopupA>(UILayer.Notice);
+            var popup = _manager.Open<TestPopupA>(UILayer.Notice);
 
             Assert.AreEqual(_manager.GetLayerRoot(UILayer.Notice), popup.transform.parent);
             Assert.AreEqual(UILayer.Notice, popup.Layer);
@@ -110,9 +110,9 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void Show_SameLayer_LaterPopupIsDrawnOnTop()
         {
-            var first = _manager.Show<TestPopupA>();
-            var second = _manager.Show<TestPopupB>();
-            var third = _manager.Show<TestPopupA>();
+            var first = _manager.Open<TestPopupA>();
+            var second = _manager.Open<TestPopupB>();
+            var third = _manager.Open<TestPopupA>();
 
             Assert.Greater(second.transform.GetSiblingIndex(), first.transform.GetSiblingIndex());
             Assert.Greater(third.transform.GetSiblingIndex(), second.transform.GetSiblingIndex());
@@ -123,14 +123,14 @@ namespace Nyonyo.Framework.Editor.Tests
         {
             var manager = new PopupManager(null, _parent.transform);
 
-            var e = Assert.Throws<InvalidOperationException>(() => manager.Show<TestPopupA>());
+            var e = Assert.Throws<InvalidOperationException>(() => manager.Open<TestPopupA>());
             StringAssert.Contains(nameof(TestPopupA), e.Message);
         }
 
         [Test]
         public void Close_DestroysPopupAndRemovesFromOpenList()
         {
-            var popup = _manager.Show<TestPopupA>();
+            var popup = _manager.Open<TestPopupA>();
 
             popup.Close();
 
@@ -140,46 +140,94 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
-        public void Close_RaisesClosedEventOnce()
+        public void OnClosed_RunsOnceWhenClosed()
         {
-            var popup = _manager.Show<TestPopupA>();
+            var popup = _manager.Open<TestPopupA>();
             var count = 0;
-            popup.Closed += _ => count++;
+            popup.OnClosed(() => count++);
 
+            popup.Close();
             popup.Close();
 
             Assert.AreEqual(1, count);
         }
 
         [Test]
+        public void OnClosed_CanBeChainedAfterOpen()
+        {
+            var closed = false;
+            _manager.Open<TestPopupA>().OnClosed(() => closed = true);
+
+            _manager.CloseAll();
+
+            Assert.IsTrue(closed);
+        }
+
+        [Test]
+        public void OnClosed_OnAlreadyClosedPopup_RunsImmediately()
+        {
+            var popup = _manager.Open<TestPopupA>();
+            popup.Close();
+            var ran = false;
+
+            popup.OnClosed(() => ran = true);
+
+            Assert.IsTrue(ran);
+        }
+
+        [Test]
         public void Find_ReturnsTopmostInstance()
         {
-            _manager.Show<TestPopupA>(UILayer.System);
-            _manager.Show<TestPopupA>(UILayer.Popup);
-            var top = _manager.Show<TestPopupA>(UILayer.Notice);
+            _manager.Open<TestPopupA>(UILayer.System);
+            _manager.Open<TestPopupA>(UILayer.Popup);
+            var top = _manager.Open<TestPopupA>(UILayer.Notice);
 
             Assert.AreSame(top, _manager.Find<TestPopupA>());
             Assert.IsNull(_manager.Find<TestPopupB>());
         }
 
         [Test]
-        public void HandleBack_SkipsHiddenPopups()
+        public void Close_CallsCloseHooksBeforeOnClosedCallbacks()
         {
-            var lower = _manager.Show<TestPopupA>(UILayer.Popup);
-            var hidden = _manager.Show<TestPopupB>(UILayer.System);
-            hidden.Hide();
+            var popup = _manager.Open<TestPopupA>();
+            var log = popup.Log;
+            popup.OnClosed(() => log.Add("closed 1"));
+            popup.OnClosed(() => log.Add("closed 2"));
 
-            Assert.IsTrue(_manager.HandleBack());
+            popup.Close();
 
-            Assert.IsTrue(lower == null);
-            Assert.IsTrue(hidden != null);
+            CollectionAssert.AreEqual(new[] { "prev open", "post open", "prev close", "post close", "closed 1", "closed 2" }, log);
+        }
+
+        [Test]
+        public void Hooks_RunBeforeAndAfterOpenListChanges()
+        {
+            var popup = _manager.Open<TestPopupA>();
+            var listed = popup.ListedAtHook;
+
+            popup.Close();
+
+            // PrevOpen: 목록 전, PostOpen: 목록 안, PrevClose: 아직 목록 안, PostClose: 목록에서 빠짐
+            CollectionAssert.AreEqual(new[] { false, true, true, false }, listed);
+        }
+
+        [Test]
+        public void Close_DestroysChildViews()
+        {
+            var popup = _manager.Open<TestPopupA>();
+            var child = new GameObject("UI_Tab", typeof(RectTransform)).AddComponent<TestChildUI>();
+            child.transform.SetParent(popup.transform, false);
+
+            popup.Close();
+
+            Assert.IsTrue(child == null, "팝업 자식 UIView는 팝업과 함께 파괴되어야 합니다.");
         }
 
         [Test]
         public void HandleBack_ClosesTopmostPopupAcrossLayers()
         {
-            var lower = _manager.Show<TestPopupA>(UILayer.Popup);
-            var upper = _manager.Show<TestPopupB>(UILayer.System);
+            var lower = _manager.Open<TestPopupA>(UILayer.Popup);
+            var upper = _manager.Open<TestPopupB>(UILayer.System);
 
             Assert.IsTrue(_manager.HandleBack());
             Assert.IsTrue(upper == null);
@@ -193,8 +241,8 @@ namespace Nyonyo.Framework.Editor.Tests
         public void HandleBack_SkipsIgnorePopups()
         {
             SetSerialized(_prefabB, "_backKey", p => p.enumValueIndex = (int)BackKeyBehavior.Ignore);
-            var popup = _manager.Show<TestPopupA>(UILayer.Popup);
-            var notice = _manager.Show<TestPopupB>(UILayer.Notice);
+            var popup = _manager.Open<TestPopupA>(UILayer.Popup);
+            var notice = _manager.Open<TestPopupB>(UILayer.Notice);
 
             Assert.IsTrue(_manager.HandleBack());
 
@@ -206,8 +254,8 @@ namespace Nyonyo.Framework.Editor.Tests
         public void HandleBack_BlockPopupStopsBackKey()
         {
             SetSerialized(_prefabB, "_backKey", p => p.enumValueIndex = (int)BackKeyBehavior.Block);
-            var popup = _manager.Show<TestPopupA>(UILayer.Popup);
-            var blocker = _manager.Show<TestPopupB>(UILayer.System);
+            var popup = _manager.Open<TestPopupA>(UILayer.Popup);
+            var blocker = _manager.Open<TestPopupB>(UILayer.System);
 
             Assert.IsTrue(_manager.HandleBack());
 
@@ -228,8 +276,8 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void CloseAll_WithLayer_ClosesOnlyThatLayer()
         {
-            var popup = _manager.Show<TestPopupA>(UILayer.Popup);
-            var system = _manager.Show<TestPopupB>(UILayer.System);
+            var popup = _manager.Open<TestPopupA>(UILayer.Popup);
+            var system = _manager.Open<TestPopupB>(UILayer.System);
 
             _manager.CloseAll(UILayer.Popup);
 
@@ -241,8 +289,8 @@ namespace Nyonyo.Framework.Editor.Tests
         public void SceneLoaded_ClosesOnlyPopupsMarkedCloseOnSceneChange()
         {
             SetSerialized(_prefabB, "_closeOnSceneChange", p => p.boolValue = false);
-            var closes = _manager.Show<TestPopupA>();
-            var stays = _manager.Show<TestPopupB>();
+            var closes = _manager.Open<TestPopupA>();
+            var stays = _manager.Open<TestPopupB>();
 
             _eventBus.Publish(new SceneLoaded("Next"));
 
@@ -257,8 +305,8 @@ namespace Nyonyo.Framework.Editor.Tests
             loader.Assets["Popups/TestPopupB"] = _prefabB.gameObject;
             var manager = new PopupManager(null, _parent.transform, null, loader);
 
-            var first = manager.Show<TestPopupB>();
-            var second = manager.Show<TestPopupB>();
+            var first = manager.Open<TestPopupB>();
+            var second = manager.Open<TestPopupB>();
 
             Assert.IsNotNull(first);
             Assert.AreNotSame(first, second);
@@ -269,13 +317,13 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
-        public void ShowAsync_LoadsPrefabFromPopupAttribute()
+        public void OpenAsync_LoadsPrefabFromPopupAttribute()
         {
             var loader = new FakeAssetLoader();
             loader.Assets["Popups/TestPopupB"] = _prefabB.gameObject;
             var manager = new PopupManager(null, _parent.transform, null, loader);
 
-            var awaiter = manager.ShowAsync<TestPopupB>(UILayer.System).GetAwaiter();
+            var awaiter = manager.OpenAsync<TestPopupB>(UILayer.System).GetAwaiter();
             Assert.IsTrue(awaiter.IsCompleted);
             var popup = awaiter.GetResult();
 
@@ -288,7 +336,7 @@ namespace Nyonyo.Framework.Editor.Tests
         {
             var manager = new PopupManager(null, _parent.transform, null, new FakeAssetLoader());
 
-            var e = Assert.Throws<InvalidOperationException>(() => manager.Show<TestPopupA>());
+            var e = Assert.Throws<InvalidOperationException>(() => manager.Open<TestPopupA>());
             StringAssert.Contains("Popup", e.Message);
             manager.Dispose();
         }
@@ -302,7 +350,7 @@ namespace Nyonyo.Framework.Editor.Tests
             loader.Assets["Popups/TestPopupB"] = wrongPrefab;
             var manager = new PopupManager(null, _parent.transform, null, loader);
 
-            Assert.Throws<InvalidOperationException>(() => manager.Show<TestPopupB>());
+            Assert.Throws<InvalidOperationException>(() => manager.Open<TestPopupB>());
             CollectionAssert.Contains(loader.Log, "release:Popups/TestPopupB:Resources");
             manager.Dispose();
         }
@@ -310,7 +358,7 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void FindPreloadPopupTypes_FindsOnlyPreloadPopups()
         {
-            var types = PopupManager.FindPreloadPopupTypes(new[] { typeof(TestPopupB).Assembly });
+            var types = _manager.FindPreloadPopupTypes(new[] { typeof(TestPopupB).Assembly });
 
             CollectionAssert.Contains(types, typeof(TestPopupB));
             CollectionAssert.DoesNotContain(types, typeof(TestPopupA));
@@ -319,7 +367,7 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void FindPreloadPopupTypes_SkipsTestAssemblies()
         {
-            CollectionAssert.DoesNotContain(PopupManager.FindPreloadPopupTypes(), typeof(TestPopupB));
+            CollectionAssert.DoesNotContain(_manager.FindPreloadPopupTypes(), typeof(TestPopupB));
         }
 
         [Test]
@@ -332,7 +380,7 @@ namespace Nyonyo.Framework.Editor.Tests
             var awaiter = manager.PreloadTypesAsync(new[] { typeof(TestPopupB) }, default).GetAwaiter();
             Assert.IsTrue(awaiter.IsCompleted);
             awaiter.GetResult();
-            manager.Show<TestPopupB>();
+            manager.Open<TestPopupB>();
 
             CollectionAssert.AreEqual(new[] { "load:Popups/TestPopupB:Resources" }, loader.Log);
             manager.Dispose();
@@ -356,7 +404,7 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void DestroyedWithoutClose_IsRemovedFromOpenList()
         {
-            var popup = _manager.Show<TestPopupA>();
+            var popup = _manager.Open<TestPopupA>();
 
             Object.DestroyImmediate(popup.gameObject);
 

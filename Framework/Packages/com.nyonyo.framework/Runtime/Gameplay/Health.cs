@@ -22,15 +22,15 @@ namespace Nyonyo.Framework.Gameplay
     {
         [Tooltip("최대 체력입니다.")]
         [Min(1f)]
-        [SerializeField] float _max = 100f;
+        [SerializeField] private float _max = 100f;
 
         [Tooltip("피해를 받은 뒤 이 시간(초) 동안 추가 피해를 받지 않습니다.")]
         [Min(0f)]
-        [SerializeField] float _invincibleSeconds = 0f;
+        [SerializeField] private float _invincibleSeconds = 0f;
 
-        float _current;
-        double _invincibleUntil = double.MinValue;
-        bool _initialized;
+        private float _current;
+        private double _invincibleUntil = double.MinValue;
+        private bool _initialized;
 
         public float Max => _max;
 
@@ -129,9 +129,9 @@ namespace Nyonyo.Framework.Gameplay
         {
         }
 
-        void Awake() => EnsureInitialized();
+        private void Awake() => EnsureInitialized();
 
-        void EnsureInitialized()
+        private void EnsureInitialized()
         {
             if (_initialized)
                 return;

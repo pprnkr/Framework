@@ -15,7 +15,7 @@ namespace Nyonyo.Framework
     /// </remarks>
     public sealed class ServiceRegistry : IDisposable
     {
-        enum Phase
+        private enum Phase
         {
             Registering,
             Initializing,
@@ -24,10 +24,10 @@ namespace Nyonyo.Framework
             Disposed,
         }
 
-        readonly Dictionary<Type, object> _services = new();
-        readonly List<object> _instances = new();
-        readonly List<object> _initialized = new();
-        Phase _phase = Phase.Registering;
+        private readonly Dictionary<Type, object> _services = new();
+        private readonly List<object> _instances = new();
+        private readonly List<object> _initialized = new();
+        private Phase _phase = Phase.Registering;
 
         /// <summary>
         /// 서비스를 <typeparamref name="TService"/> 타입으로 등록합니다. 초기화가 시작되기 전에만 호출할 수 있습니다.
@@ -131,7 +131,7 @@ namespace Nyonyo.Framework
             _services.Clear();
         }
 
-        bool ContainsInstance(object instance)
+        private bool ContainsInstance(object instance)
         {
             foreach (var existing in _instances)
             {
@@ -142,7 +142,7 @@ namespace Nyonyo.Framework
             return false;
         }
 
-        static void DisposeSafely(object instance)
+        private void DisposeSafely(object instance)
         {
             if (instance is not IDisposable disposable)
                 return;

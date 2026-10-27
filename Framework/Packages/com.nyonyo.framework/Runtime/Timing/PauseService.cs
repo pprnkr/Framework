@@ -25,18 +25,18 @@ namespace Nyonyo.Framework.Timing
     /// </remarks>
     /// <example>
     /// <code>
-    /// PauseService.Instance.Pause(this);   // 설정 팝업 OnOpen
+    /// PauseService.Instance.Pause(this);   // 설정 팝업 PostOpen
     /// PauseService.Instance.Resume(this);  // 설정 팝업 Close
     /// PauseService.Instance.TimeScale = 0.3f; // 슬로 모션
     /// </code>
     /// </example>
     public sealed class PauseService : IDisposable
     {
-        readonly HashSet<object> _requests = new();
-        readonly IEventBus _eventBus;
-        float _timeScale = 1f;
-        bool _pauseAudio;
-        bool _wasPaused;
+        private readonly HashSet<object> _requests = new();
+        private readonly IEventBus _eventBus;
+        private float _timeScale = 1f;
+        private bool _pauseAudio;
+        private bool _wasPaused;
 
         /// <summary>
         /// 서비스로 등록된 PauseService입니다. <c>Services.Get&lt;PauseService&gt;()</c>와 같습니다.
@@ -116,7 +116,7 @@ namespace Nyonyo.Framework.Timing
             AudioListener.pause = false;
         }
 
-        void Apply()
+        private void Apply()
         {
             var paused = IsPaused;
             Time.timeScale = paused ? 0f : _timeScale;

@@ -16,13 +16,13 @@ namespace Nyonyo.Framework.Editor.Audio
     public static class SoundAddressRegistrar
     {
         [MenuItem("Tools/Nyonyo Framework/Sound/Register Sounds to Addressables")]
-        static void RegisterFromMenu()
+        private static void RegisterFromMenu()
         {
             var settings = FindSettings();
             if (settings == null)
             {
                 EditorUtility.DisplayDialog("Register Sounds",
-                    "SoundSettings 에셋이 없습니다. Create > Nyonyo Framework > Sound Settings로 만든 뒤 다시 실행해 주세요.", "확인");
+                    "SoundSettings 에셋이 없습니다. Tools > Nyonyo Framework > Settings > Sound Settings로 만든 뒤 다시 실행해 주세요.", "확인");
                 return;
             }
 
@@ -48,7 +48,7 @@ namespace Nyonyo.Framework.Editor.Audio
             return count;
         }
 
-        static int Register(string folder, string pathFormat)
+        private static int Register(string folder, string pathFormat)
         {
             if (string.IsNullOrEmpty(folder) || !AssetDatabase.IsValidFolder(folder))
             {
@@ -75,7 +75,7 @@ namespace Nyonyo.Framework.Editor.Audio
             return count;
         }
 
-        static SoundSettings FindSettings()
+        private static SoundSettings FindSettings()
         {
             foreach (var guid in AssetDatabase.FindAssets($"t:{nameof(SoundSettings)}"))
             {

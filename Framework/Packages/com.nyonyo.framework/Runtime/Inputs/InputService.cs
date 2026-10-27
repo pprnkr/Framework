@@ -32,14 +32,14 @@ namespace Nyonyo.Framework.Inputs
         public const string BindingsSaveKey = "input.bindings";
 
         [Serializable]
-        sealed class BindingData
+        private sealed class BindingData
         {
             public string json;
         }
 
-        readonly List<InputActionMap> _mapStack = new();
-        readonly SaveService _save;
-        InputActionRebindingExtensions.RebindingOperation _rebinding;
+        private readonly List<InputActionMap> _mapStack = new();
+        private readonly SaveService _save;
+        private InputActionRebindingExtensions.RebindingOperation _rebinding;
 
         /// <summary>
         /// 서비스로 등록된 InputService입니다. <c>Services.Get&lt;InputService&gt;()</c>와 같습니다.
@@ -178,7 +178,7 @@ namespace Nyonyo.Framework.Inputs
             _rebinding = null;
         }
 
-        void LoadBindings()
+        private void LoadBindings()
         {
             if (_save == null || !_save.TryLoad(BindingsSaveKey, out BindingData data, SaveScope.Global) ||
                 string.IsNullOrEmpty(data.json))
@@ -187,7 +187,7 @@ namespace Nyonyo.Framework.Inputs
             Actions.LoadBindingOverridesFromJson(data.json);
         }
 
-        void ApplyMaps()
+        private void ApplyMaps()
         {
             var current = CurrentMap;
             foreach (var map in Actions.actionMaps)

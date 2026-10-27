@@ -13,13 +13,13 @@ namespace Nyonyo.Framework.UI
     {
         internal PopupManager Manager;
 
-        void Update()
+        private void Update()
         {
             if (Manager != null && WasBackPressed())
                 Manager.HandleBack();
         }
 
-        static bool WasBackPressed()
+        private bool WasBackPressed()
         {
 #if NYONYO_INPUT_SYSTEM && ENABLE_INPUT_SYSTEM
             var keyboard = Keyboard.current;

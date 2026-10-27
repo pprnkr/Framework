@@ -12,7 +12,6 @@ namespace Nyonyo.Framework.Editor.UI
     /// <remarks>
     /// 프로젝트에 하나만 두면 됩니다. 없으면 처음 사용할 때 <see cref="DefaultAssetPath"/>에 기본값으로 만듭니다.
     /// </remarks>
-    [CreateAssetMenu(menuName = "Nyonyo Framework/UI Prefix Settings", fileName = "UIPrefixSettings")]
     public sealed class UIPrefixSettings : ScriptableObject
     {
         public const string DefaultAssetPath = "Assets/Editor/UIPrefixSettings.asset";
@@ -21,10 +20,10 @@ namespace Nyonyo.Framework.Editor.UI
         public sealed class Rule
         {
             [Tooltip("게임오브젝트 이름 접두사입니다. 예: IMG_")]
-            [SerializeField] string _prefix;
+            [SerializeField] private string _prefix;
 
             [Tooltip("변수 타입의 전체 이름입니다. 예: UnityEngine.UI.Image. UnityEngine.GameObject도 쓸 수 있습니다.")]
-            [SerializeField] string _typeName;
+            [SerializeField] private string _typeName;
 
             public Rule()
             {
@@ -44,13 +43,13 @@ namespace Nyonyo.Framework.Editor.UI
         }
 
         [Tooltip("새로 만드는 스크립트의 namespace입니다. 비워 두면 namespace 없이 만듭니다.")]
-        [SerializeField] string _scriptNamespace = "";
+        [SerializeField] private string _scriptNamespace = "";
 
         [Tooltip("Assign Object를 실행할 때 Button의 OnClick에 OnButtonEvent를 자동으로 연결합니다.")]
-        [SerializeField] bool _bindButtonClick = true;
+        [SerializeField] private bool _bindButtonClick = true;
 
         [Tooltip("접두사가 여러 개 맞으면 가장 긴 접두사를 씁니다.")]
-        [SerializeField] List<Rule> _rules = CreateDefaultRules();
+        [SerializeField] private List<Rule> _rules = CreateDefaultRules();
 
         public string ScriptNamespace => _scriptNamespace == null ? "" : _scriptNamespace.Trim();
 
@@ -100,9 +99,10 @@ namespace Nyonyo.Framework.Editor.UI
 
         internal void SetRules(params Rule[] rules) => _rules = rules.ToList();
 
-        void Reset() => _rules = CreateDefaultRules();
+        private void Reset() => _rules = CreateDefaultRules();
 
-        static List<Rule> CreateDefaultRules() => new()
+        // _rules 필드 초기화식에서 부르므로 static입니다(초기화식에서는 instance 함수를 부를 수 없습니다).
+        private static List<Rule> CreateDefaultRules() => new()
         {
             new Rule("IMG_", "UnityEngine.UI.Image"),
             new Rule("RIMG_", "UnityEngine.UI.RawImage"),

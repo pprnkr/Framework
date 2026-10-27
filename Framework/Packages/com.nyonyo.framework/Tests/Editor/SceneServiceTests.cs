@@ -12,9 +12,9 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class SceneServiceTests
     {
-        class FakeTransition : ISceneTransition
+        private class FakeTransition : ISceneTransition
         {
-            readonly List<string> _log;
+            private readonly List<string> _log;
 
             public float LastProgress = -1f;
 
@@ -35,9 +35,9 @@ namespace Nyonyo.Framework.Editor.Tests
             }
         }
 
-        class FakeLoader : ISceneLoader
+        private class FakeLoader : ISceneLoader
         {
-            readonly List<string> _log;
+            private readonly List<string> _log;
 
             public AwaitableCompletionSource Pending;
             public bool Throw;
@@ -55,11 +55,11 @@ namespace Nyonyo.Framework.Editor.Tests
             }
         }
 
-        List<string> _log;
-        FakeTransition _transition;
-        FakeLoader _loader;
-        EventBus _eventBus;
-        SceneService _service;
+        private List<string> _log;
+        private FakeTransition _transition;
+        private FakeLoader _loader;
+        private EventBus _eventBus;
+        private SceneService _service;
 
         [SetUp]
         public void SetUp()
@@ -80,7 +80,8 @@ namespace Nyonyo.Framework.Editor.Tests
             _eventBus.Dispose();
         }
 
-        static Awaitable Completed()
+        // 중첩된 FakeTransition과 FakeLoader가 함께 쓰므로 static입니다.
+        private static Awaitable Completed()
         {
             var source = new AwaitableCompletionSource();
             source.SetResult();
@@ -88,7 +89,7 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         // 가짜 연출과 로더는 즉시 완료되므로 LoadAsync도 동기적으로 끝납니다.
-        static bool LoadNow(SceneService service, string sceneName)
+        private bool LoadNow(SceneService service, string sceneName)
         {
             var awaiter = service.LoadAsync(sceneName).GetAwaiter();
             Assert.IsTrue(awaiter.IsCompleted, "LoadAsync가 동기적으로 완료되지 않았습니다.");
@@ -126,7 +127,7 @@ namespace Nyonyo.Framework.Editor.Tests
         public void Load_WhileLoading_IsIgnoredWithWarning()
         {
             _loader.Pending = new AwaitableCompletionSource();
-            _ = _service.LoadAsync("Stage1");
+            _service.Load("Stage1");
             Assert.IsTrue(_service.IsLoading);
 
             LogAssert.Expect(LogType.Warning, new Regex("Stage2"));

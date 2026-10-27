@@ -21,9 +21,9 @@ namespace Nyonyo.Framework.Timing
     /// </example>
     public sealed class TimerService : IDisposable
     {
-        readonly List<GameTimer> _timers = new();
-        readonly List<GameTimer> _added = new();
-        readonly TimerRunner _runner;
+        private readonly List<GameTimer> _timers = new();
+        private readonly List<GameTimer> _added = new();
+        private readonly TimerRunner _runner;
 
         /// <summary>
         /// 서비스로 등록된 TimerService입니다. <c>Services.Get&lt;TimerService&gt;()</c>와 같습니다.
@@ -119,7 +119,7 @@ namespace Nyonyo.Framework.Timing
             _timers.RemoveAll(timer => !timer.IsActive);
         }
 
-        GameTimer Add(float seconds, Action callback, bool unscaledTime, int repeatCount, Object owner)
+        private GameTimer Add(float seconds, Action callback, bool unscaledTime, int repeatCount, Object owner)
         {
             if (callback == null)
                 throw new ArgumentNullException(nameof(callback));

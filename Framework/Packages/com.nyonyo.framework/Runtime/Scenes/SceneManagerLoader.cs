@@ -11,7 +11,7 @@ namespace Nyonyo.Framework.Scenes
     public sealed class SceneManagerLoader : ISceneLoader
     {
         // Unity는 씬 활성화 직전까지의 진행률을 0~0.9로 보고합니다.
-        const float LoadedProgress = 0.9f;
+        private const float LoadedProgress = 0.9f;
 
         public async Awaitable LoadAsync(string sceneName, Action<float> onProgress, CancellationToken cancellationToken)
         {

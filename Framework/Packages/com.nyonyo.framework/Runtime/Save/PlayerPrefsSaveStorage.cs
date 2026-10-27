@@ -11,7 +11,7 @@ namespace Nyonyo.Framework.Save
     /// </remarks>
     public sealed class PlayerPrefsSaveStorage : ISaveStorage
     {
-        readonly string _prefix;
+        private readonly string _prefix;
 
         public PlayerPrefsSaveStorage(string prefix = "nyonyo.save.")
         {

@@ -9,7 +9,7 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class GameplayTests
     {
-        readonly List<GameObject> _objects = new();
+        private readonly List<GameObject> _objects = new();
 
         [TearDown]
         public void TearDown()
@@ -23,7 +23,7 @@ namespace Nyonyo.Framework.Editor.Tests
             _objects.Clear();
         }
 
-        Health CreateHealth(string name = "Target")
+        private Health CreateHealth(string name = "Target")
         {
             var go = new GameObject(name);
             _objects.Add(go);
@@ -162,7 +162,7 @@ namespace Nyonyo.Framework.Editor.Tests
             Assert.AreEqual(new Vector2(0f, -1f), CameraMath2D.ApplyDeadZone(Vector2.zero, new Vector2(0f, -2f), deadZone));
         }
 
-        static void SetInvincibleSeconds(Health health, float seconds)
+        private void SetInvincibleSeconds(Health health, float seconds)
         {
             var serialized = new UnityEditor.SerializedObject(health);
             serialized.FindProperty("_invincibleSeconds").floatValue = seconds;

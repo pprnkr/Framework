@@ -11,17 +11,17 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class EventBusTests
     {
-        struct TestEvent : IEvent
+        private struct TestEvent : IEvent
         {
             public int Value;
         }
 
-        struct OtherEvent : IEvent
+        private struct OtherEvent : IEvent
         {
         }
 
-        EventBus _bus;
-        List<string> _log;
+        private EventBus _bus;
+        private List<string> _log;
 
         [SetUp]
         public void SetUp()
@@ -33,7 +33,7 @@ namespace Nyonyo.Framework.Editor.Tests
         [TearDown]
         public void TearDown() => _bus.Dispose();
 
-        Action<TestEvent> Record(string name) => e => _log.Add($"{name}:{e.Value}");
+        private Action<TestEvent> Record(string name) => e => _log.Add($"{name}:{e.Value}");
 
         [Test]
         public void Publish_PassesEventToHandler()

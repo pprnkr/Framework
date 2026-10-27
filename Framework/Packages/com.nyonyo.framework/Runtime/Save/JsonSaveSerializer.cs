@@ -14,7 +14,7 @@ namespace Nyonyo.Framework.Save
     /// </remarks>
     public sealed class JsonSaveSerializer : ISaveSerializer
     {
-        readonly bool _prettyPrint;
+        private readonly bool _prettyPrint;
 
         public JsonSaveSerializer(bool prettyPrint = false)
         {

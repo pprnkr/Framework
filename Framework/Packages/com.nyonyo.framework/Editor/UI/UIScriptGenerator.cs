@@ -15,15 +15,15 @@ namespace Nyonyo.Framework.Editor.UI
     static class UIScriptGenerator
     {
         public const string RegionStart = "#region Auto Generated UI";
-        const string RegionEnd = "#endregion";
-        const string Indent = "    ";
+        private const string RegionEnd = "#endregion";
+        private const string Indent = "    ";
 
         // 인스펙터에서 연결하는 필드라 코드에서 쓰지 않으면 나는 경고(사용 안 함, 할당 안 함)를 끕니다.
-        const string WarningDisable = "#pragma warning disable CS0169, CS0649";
-        const string WarningRestore = "#pragma warning restore CS0169, CS0649";
+        private const string WarningDisable = "#pragma warning disable CS0169, CS0649";
+        private const string WarningRestore = "#pragma warning restore CS0169, CS0649";
 
-        static readonly Regex s_usingPattern = new(@"^\s*using\s+([\w.]+)\s*;");
-        static readonly Regex s_namespacePattern = new(@"^\s*namespace\s+([\w.]+)");
+        private static readonly Regex s_usingPattern = new(@"^\s*using\s+([\w.]+)\s*;");
+        private static readonly Regex s_namespacePattern = new(@"^\s*namespace\s+([\w.]+)");
 
         /// <summary>
         /// 프리팹 경로로 <see cref="PopupAttribute"/>에 넣을 경로와 로드 방식을 정합니다.
@@ -42,7 +42,7 @@ namespace Nyonyo.Framework.Editor.UI
         }
 
         /// <summary>
-        /// <paramref name="baseType"/>(<see cref="PopupBase"/> 또는 <see cref="UIBase"/>)를 상속하는 새 스크립트를 만듭니다.
+        /// <paramref name="baseType"/>(<see cref="PopupBase"/> 또는 <see cref="UIView"/>)를 상속하는 새 스크립트를 만듭니다.
         /// 팝업이고 <paramref name="popupPath"/>가 있으면 <see cref="PopupAttribute"/>도 붙입니다.
         /// </summary>
         public static string CreateScript(string className, Type baseType, string scriptNamespace, IReadOnlyList<UIBinding> bindings,
@@ -88,25 +88,34 @@ namespace Nyonyo.Framework.Editor.UI
 
             if (isPopup)
             {
-                builder.AppendLine($"{member}protected override void OnOpen()");
+                builder.AppendLine($"{member}protected override void PostOpen()");
                 builder.AppendLine($"{member}{{");
                 builder.AppendLine($"{member}}}");
                 builder.AppendLine();
             }
 
-            builder.AppendLine($"{member}public override void OnButtonEvent(Button button)");
+            // 이름이 같은 버튼이 있어도 헷갈리지 않도록 이름 대신 필드 참조로 비교합니다.
+            builder.AppendLine($"{member}protected override void OnButtonClick(Button button)");
             builder.AppendLine($"{member}{{");
-            builder.AppendLine($"{body}switch (button.name)");
-            builder.AppendLine($"{body}{{");
-            foreach (var binding in bindings.Where(b => typeof(Button).IsAssignableFrom(b.FieldType)))
+            var buttons = bindings.Where(b => typeof(Button).IsAssignableFrom(b.FieldType)).ToList();
+            if (buttons.Count == 0)
             {
-                builder.AppendLine($"{body}{Indent}case \"{binding.FieldName}\":");
-                builder.AppendLine($"{body}{Indent}{Indent}break;");
+                builder.AppendLine($"{body}base.OnButtonClick(button);");
             }
-            builder.AppendLine($"{body}{Indent}default:");
-            builder.AppendLine($"{body}{Indent}{Indent}base.OnButtonEvent(button);");
-            builder.AppendLine($"{body}{Indent}{Indent}break;");
-            builder.AppendLine($"{body}}}");
+            else
+            {
+                for (var i = 0; i < buttons.Count; i++)
+                {
+                    builder.AppendLine($"{body}{(i == 0 ? "if" : "else if")} (button == {buttons[i].FieldName})");
+                    builder.AppendLine($"{body}{{");
+                    builder.AppendLine($"{body}}}");
+                }
+
+                builder.AppendLine($"{body}else");
+                builder.AppendLine($"{body}{{");
+                builder.AppendLine($"{body}{Indent}base.OnButtonClick(button);");
+                builder.AppendLine($"{body}}}");
+            }
             builder.AppendLine($"{member}}}");
 
             builder.AppendLine($"{classIndent}}}");
@@ -158,7 +167,7 @@ namespace Nyonyo.Framework.Editor.UI
             return string.Join(newline, lines);
         }
 
-        static IEnumerable<string> RegionLines(string indent, IReadOnlyList<UIBinding> bindings)
+        private static IEnumerable<string> RegionLines(string indent, IReadOnlyList<UIBinding> bindings)
         {
             yield return indent + RegionStart;
             if (bindings.Count > 0)
@@ -172,7 +181,7 @@ namespace Nyonyo.Framework.Editor.UI
             yield return indent + RegionEnd;
         }
 
-        static void AddMissingUsings(List<string> lines, IReadOnlyList<UIBinding> bindings)
+        private static void AddMissingUsings(List<string> lines, IReadOnlyList<UIBinding> bindings)
         {
             var existing = new HashSet<string>(StringComparer.Ordinal);
             var lastUsing = -1;
@@ -208,11 +217,11 @@ namespace Nyonyo.Framework.Editor.UI
         }
 
         // 파일의 namespace와 같거나 그 상위 namespace의 타입은 using 없이 보입니다.
-        static bool IsVisibleFrom(string fileNamespace, string ns) =>
+        private static bool IsVisibleFrom(string fileNamespace, string ns) =>
             fileNamespace != null && (fileNamespace == ns || fileNamespace.StartsWith(ns + ".", StringComparison.Ordinal));
 
-        static string TypeName(Type type) => type.IsNested ? type.FullName.Replace('+', '.') : type.Name;
+        private static string TypeName(Type type) => type.IsNested ? type.FullName.Replace('+', '.') : type.Name;
 
-        static string LeadingWhitespace(string line) => line.Substring(0, line.Length - line.TrimStart().Length);
+        private static string LeadingWhitespace(string line) => line.Substring(0, line.Length - line.TrimStart().Length);
     }
 }

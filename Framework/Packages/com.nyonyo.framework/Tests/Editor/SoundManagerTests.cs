@@ -11,10 +11,10 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class SoundManagerTests
     {
-        GameObject _parent;
-        FakeAssetLoader _loader;
-        SoundManager _sound;
-        readonly List<Object> _clips = new();
+        private GameObject _parent;
+        private FakeAssetLoader _loader;
+        private SoundManager _sound;
+        private readonly List<Object> _clips = new();
 
         [SetUp]
         public void SetUp()
@@ -35,7 +35,7 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         // 1초짜리 무음 클립입니다.
-        AudioClip CreateClip(string name)
+        private AudioClip CreateClip(string name)
         {
             var clip = AudioClip.Create(name, 44100, 1, 44100, false);
             _clips.Add(clip);
@@ -43,14 +43,14 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         // 가짜 로더는 즉시 완료되므로 재생 함수도 동기적으로 끝납니다.
-        static void Run(Awaitable awaitable)
+        private void Run(Awaitable awaitable)
         {
             var awaiter = awaitable.GetAwaiter();
             Assert.IsTrue(awaiter.IsCompleted, "재생 함수가 동기적으로 완료되지 않았습니다.");
             awaiter.GetResult();
         }
 
-        int LoadCount(string path) => _loader.Log.Count(entry => entry.StartsWith($"load:{path}:"));
+        private int LoadCount(string path) => _loader.Log.Count(entry => entry.StartsWith($"load:{path}:"));
 
         [Test]
         public void DefaultSettings_HaveEightSfxChannels()
@@ -61,7 +61,7 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void PlaySFX_LoadsFromSfxPathWithAddressables()
         {
-            Run(_sound.PlaySFX("Hit"));
+            Run(_sound.PlaySFXAsync("Hit"));
 
             Assert.AreEqual("load:SFX/Hit:Addressables", _loader.Log[0]);
             Assert.AreEqual("SFX/Hit", _sound.GetSfxSource(0).clip.name);
@@ -73,7 +73,7 @@ namespace Nyonyo.Framework.Editor.Tests
             _sound.MasterVolume = 0.5f;
             _sound.SfxVolume = 0.5f;
 
-            Run(_sound.PlaySFX("Hit", 0.5f));
+            Run(_sound.PlaySFXAsync("Hit", 0.5f));
 
             Assert.AreEqual(0.125f, _sound.GetSfxSource(0).volume, 1e-5f);
         }
@@ -81,8 +81,8 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void ChangingVolumes_UpdatesPlayingSounds()
         {
-            Run(_sound.PlaySFX("Hit", 0.5f));
-            Run(_sound.PlayBGM("Title", 0.8f));
+            Run(_sound.PlaySFXAsync("Hit", 0.5f));
+            Run(_sound.PlayBGMAsync("Title", 0.8f));
 
             _sound.MasterVolume = 0.5f;
             Assert.AreEqual(0.25f, _sound.GetSfxSource(0).volume, 1e-5f);
@@ -112,10 +112,33 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
+        public void PlaySFXAndPlayBGM_WithoutAwait_StartPlaying()
+        {
+            _sound.PlaySFX("Hit");
+            _sound.PlayBGM("Title");
+
+            Assert.AreEqual("SFX/Hit", _sound.GetSfxSource(0).clip.name);
+            Assert.AreEqual("Title", _sound.CurrentBgm);
+
+            _sound.StopBGM();
+            Assert.IsNull(_sound.CurrentBgm);
+        }
+
+        [Test]
+        public void PlaySFX_WithoutAwait_Missing_LogsErrorWithoutThrowing()
+        {
+            LogAssert.Expect(LogType.Error, new Regex("Missing"));
+
+            _sound.PlaySFX("Missing");
+
+            Assert.IsNull(_sound.GetSfxSource(0).clip);
+        }
+
+        [Test]
         public void PlaySFX_SameName_LoadsOnce()
         {
-            Run(_sound.PlaySFX("Hit"));
-            Run(_sound.PlaySFX("Hit"));
+            Run(_sound.PlaySFXAsync("Hit"));
+            Run(_sound.PlaySFXAsync("Hit"));
 
             Assert.AreEqual(1, LoadCount("SFX/Hit"));
         }
@@ -124,9 +147,9 @@ namespace Nyonyo.Framework.Editor.Tests
         public void PlaySFX_WhenAllChannelsBusy_ReplacesOldest()
         {
             for (var i = 0; i < 8; i++)
-                Run(_sound.PlaySFX($"S{i}"));
+                Run(_sound.PlaySFXAsync($"S{i}"));
 
-            Run(_sound.PlaySFX("S8"));
+            Run(_sound.PlaySFXAsync("S8"));
 
             Assert.AreEqual("SFX/S8", _sound.GetSfxSource(0).clip.name);
             Assert.AreEqual("SFX/S1", _sound.GetSfxSource(1).clip.name);
@@ -138,7 +161,7 @@ namespace Nyonyo.Framework.Editor.Tests
         {
             LogAssert.Expect(LogType.Error, new Regex("Missing"));
 
-            Run(_sound.PlaySFX("Missing"));
+            Run(_sound.PlaySFXAsync("Missing"));
 
             Assert.IsNull(_sound.GetSfxSource(0).clip);
         }
@@ -146,7 +169,7 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void PlayBGM_LoadsFromBgmPathAndLoops()
         {
-            Run(_sound.PlayBGM("Title"));
+            Run(_sound.PlayBGMAsync("Title"));
 
             CollectionAssert.Contains(_loader.Log, "load:BGM/Title:Addressables");
             Assert.AreEqual("Title", _sound.CurrentBgm);
@@ -157,8 +180,8 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void PlayBGM_Switch_ReleasesPreviousBgm()
         {
-            Run(_sound.PlayBGM("A"));
-            Run(_sound.PlayBGM("B"));
+            Run(_sound.PlayBGMAsync("A"));
+            Run(_sound.PlayBGMAsync("B"));
 
             Assert.AreEqual("B", _sound.CurrentBgm);
             CollectionAssert.Contains(_loader.Log, "release:BGM/A:Addressables");
@@ -168,8 +191,8 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void PlayBGM_SameName_DoesNotReloadAndUpdatesVolume()
         {
-            Run(_sound.PlayBGM("A"));
-            Run(_sound.PlayBGM("A", 0.5f));
+            Run(_sound.PlayBGMAsync("A"));
+            Run(_sound.PlayBGMAsync("A", 0.5f));
 
             Assert.AreEqual(1, LoadCount("BGM/A"));
             Assert.AreEqual(0.5f, _sound.ActiveBgmSource.volume, 1e-5f);
@@ -178,9 +201,9 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void StopBGM_StopsAndReleases()
         {
-            Run(_sound.PlayBGM("A"));
+            Run(_sound.PlayBGMAsync("A"));
 
-            Run(_sound.StopBGM());
+            Run(_sound.StopBGMAsync());
 
             Assert.IsNull(_sound.CurrentBgm);
             CollectionAssert.Contains(_loader.Log, "release:BGM/A:Addressables");
@@ -189,10 +212,10 @@ namespace Nyonyo.Framework.Editor.Tests
         [Test]
         public void UnloadSFX_ReleasesAndLoadsAgainNextTime()
         {
-            Run(_sound.PlaySFX("Hit"));
+            Run(_sound.PlaySFXAsync("Hit"));
 
             _sound.UnloadSFX("Hit");
-            Run(_sound.PlaySFX("Hit"));
+            Run(_sound.PlaySFXAsync("Hit"));
 
             CollectionAssert.Contains(_loader.Log, "release:SFX/Hit:Addressables");
             Assert.AreEqual(2, LoadCount("SFX/Hit"));
@@ -227,10 +250,24 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
+        public void Volumes_AreSavedWhenFocusIsLost()
+        {
+            var save = new SaveService(new MemorySaveStorage());
+            var sound = new SoundManager(null, _parent.transform, _loader, save);
+            sound.BgmVolume = 0.4f;
+
+            sound.OnFocusChanged(false);
+
+            var saved = save.Load<SoundVolumeData>(SoundManager.VolumeSaveKey, scope: SaveScope.Global);
+            Assert.AreEqual(0.4f, saved.bgm, 1e-5f);
+            sound.Dispose();
+        }
+
+        [Test]
         public void Dispose_ReleasesLoadedSounds()
         {
-            Run(_sound.PlaySFX("Hit"));
-            Run(_sound.PlayBGM("A"));
+            Run(_sound.PlaySFXAsync("Hit"));
+            Run(_sound.PlayBGMAsync("A"));
 
             _sound.Dispose();
 

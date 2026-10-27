@@ -30,15 +30,15 @@ namespace Nyonyo.Framework.Logging
     /// </example>
     public static class Log
     {
-        const string EditorSymbol = "UNITY_EDITOR";
-        const string DevelopmentSymbol = "DEVELOPMENT_BUILD";
-        const string ForceSymbol = "NYONYO_LOG";
+        private const string EditorSymbol = "UNITY_EDITOR";
+        private const string DevelopmentSymbol = "DEVELOPMENT_BUILD";
+        private const string ForceSymbol = "NYONYO_LOG";
 
         /// <summary>이 레벨보다 낮은 로그는 남기지 않습니다. 기본값은 <see cref="LogLevel.Debug"/>(모두 남김)입니다.</summary>
         public static LogLevel MinimumLevel { get; set; } = LogLevel.Debug;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        static void ResetStatics() => MinimumLevel = LogLevel.Debug;
+        private static void ResetStatics() => MinimumLevel = LogLevel.Debug;
 
         [Conditional(EditorSymbol), Conditional(DevelopmentSymbol), Conditional(ForceSymbol)]
         public static void Debug(string message, Object context = null) => Write(LogLevel.Debug, null, message, context);
@@ -84,7 +84,7 @@ namespace Nyonyo.Framework.Logging
     /// </summary>
     public readonly struct LogChannel
     {
-        readonly string _category;
+        private readonly string _category;
 
         public LogChannel(string category) => _category = category;
 

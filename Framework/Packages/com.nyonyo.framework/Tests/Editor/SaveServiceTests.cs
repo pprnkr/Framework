@@ -42,8 +42,8 @@ namespace Nyonyo.Framework.Editor.Tests
             }
         }
 
-        MemorySaveStorage _storage;
-        SaveService _save;
+        private MemorySaveStorage _storage;
+        private SaveService _save;
 
         [SetUp]
         public void SetUp()

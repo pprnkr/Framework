@@ -9,7 +9,7 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class InputServiceTests
     {
-        InputActionAsset _asset;
+        private InputActionAsset _asset;
 
         [SetUp]
         public void SetUp()

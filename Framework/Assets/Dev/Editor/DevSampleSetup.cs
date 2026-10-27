@@ -19,18 +19,18 @@ namespace Nyonyo.Dev.Editor
     /// </summary>
     static class DevSampleSetup
     {
-        const string DevFolder = "Assets/Dev";
-        const string PrefabFolder = DevFolder + "/Prefabs";
-        const string SoundFolder = DevFolder + "/Sounds";
-        const string UISettingsPath = DevFolder + "/DevUISettings.asset";
-        const string SoundSettingsPath = DevFolder + "/DevSoundSettings.asset";
-        const string InstallerPath = DevFolder + "/DevInstaller.asset";
-        const string FrameworkSettingsPath = "Assets/Resources/NyonyoFrameworkSettings.asset";
-        const string SceneA = "Assets/Scenes/SampleScene.unity";
-        const string SceneB = "Assets/Scenes/SampleScene2.unity";
+        private const string DevFolder = "Assets/Dev";
+        private const string PrefabFolder = DevFolder + "/Prefabs";
+        private const string SoundFolder = DevFolder + "/Sounds";
+        private const string UISettingsPath = DevFolder + "/DevUISettings.asset";
+        private const string SoundSettingsPath = DevFolder + "/DevSoundSettings.asset";
+        private const string InstallerPath = DevFolder + "/DevInstaller.asset";
+        private const string FrameworkSettingsPath = "Assets/Resources/NyonyoFrameworkSettings.asset";
+        private const string SceneA = "Assets/Scenes/SampleScene.unity";
+        private const string SceneB = "Assets/Scenes/SampleScene2.unity";
 
         [MenuItem("Tools/Nyonyo Framework/Dev/Setup Samples")]
-        static void Setup()
+        private static void Setup()
         {
             CreateFolder(DevFolder, "Prefabs");
             CreateFolder(DevFolder, "Sounds");
@@ -55,14 +55,14 @@ namespace Nyonyo.Dev.Editor
             Debug.Log("[Dev] 샘플 준비 완료. Play를 누르고 왼쪽 위 버튼으로 확인하세요.");
         }
 
-        static void CreateFolder(string parent, string name)
+        private static void CreateFolder(string parent, string name)
         {
             if (!AssetDatabase.IsValidFolder($"{parent}/{name}"))
                 AssetDatabase.CreateFolder(parent, name);
         }
 
         // 테스트용 사운드를 사인파 WAV로 만듭니다. 이미 있으면 건너뜁니다.
-        static void CreateSounds()
+        private static void CreateSounds()
         {
             WriteTone($"{SoundFolder}/BGM/DevBgmA.wav", 4f, 261.63f, 329.63f, 392f);
             WriteTone($"{SoundFolder}/BGM/DevBgmB.wav", 4f, 220f, 261.63f, 329.63f);
@@ -70,7 +70,7 @@ namespace Nyonyo.Dev.Editor
             WriteTone($"{SoundFolder}/SFX/Click.wav", 0.08f, 1320f);
         }
 
-        static void WriteTone(string assetPath, float seconds, params float[] frequencies)
+        private static void WriteTone(string assetPath, float seconds, params float[] frequencies)
         {
             if (File.Exists(assetPath))
                 return;
@@ -104,7 +104,7 @@ namespace Nyonyo.Dev.Editor
             AssetDatabase.ImportAsset(assetPath);
         }
 
-        static SoundSettings CreateSoundSettings()
+        private static SoundSettings CreateSoundSettings()
         {
             var settings = AssetDatabase.LoadAssetAtPath<SoundSettings>(SoundSettingsPath);
             if (settings == null)
@@ -120,7 +120,7 @@ namespace Nyonyo.Dev.Editor
             return settings;
         }
 
-        static PopupTest CreatePopupTestPrefab()
+        private static PopupTest CreatePopupTestPrefab()
         {
             var root = CreateUI("PopupTest", null);
             Stretch(root);
@@ -150,7 +150,7 @@ namespace Nyonyo.Dev.Editor
             return SavePrefab<PopupTest>(root.gameObject, $"{PrefabFolder}/PopupTest.prefab");
         }
 
-        static PopupNotice CreatePopupNoticePrefab()
+        private static PopupNotice CreatePopupNoticePrefab()
         {
             var root = CreateUI("PopupNotice", null);
             Stretch(root);
@@ -180,7 +180,7 @@ namespace Nyonyo.Dev.Editor
             return SavePrefab<PopupNotice>(root.gameObject, $"{PrefabFolder}/PopupNotice.prefab");
         }
 
-        static UISettings CreateUISettings()
+        private static UISettings CreateUISettings()
         {
             var settings = AssetDatabase.LoadAssetAtPath<UISettings>(UISettingsPath);
             if (settings == null)
@@ -189,10 +189,14 @@ namespace Nyonyo.Dev.Editor
                 AssetDatabase.CreateAsset(settings, UISettingsPath);
             }
 
+            // 샘플 프로젝트의 Player Settings도 UISettings의 방향(기본 세로형)에 맞춥니다.
+            if (!OrientationPlayerSettings.IsApplied(settings))
+                OrientationPlayerSettings.Apply(settings);
+
             return settings;
         }
 
-        static DevInstaller CreateInstaller(UISettings uiSettings, SoundSettings soundSettings)
+        private static DevInstaller CreateInstaller(UISettings uiSettings, SoundSettings soundSettings)
         {
             // 이미 만들어 둔 DevInstaller가 있으면 그걸 씁니다.
             var guid = AssetDatabase.FindAssets("t:DevInstaller").FirstOrDefault();
@@ -210,7 +214,7 @@ namespace Nyonyo.Dev.Editor
             return installer;
         }
 
-        static void AddInstallerToFrameworkSettings(DevInstaller installer)
+        private static void AddInstallerToFrameworkSettings(DevInstaller installer)
         {
             var settings = AssetDatabase.LoadAssetAtPath<FrameworkSettings>(FrameworkSettingsPath);
             if (settings == null)
@@ -234,7 +238,7 @@ namespace Nyonyo.Dev.Editor
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        static void SetupScenes()
+        private static void SetupScenes()
         {
             if (!File.Exists(SceneB))
                 AssetDatabase.CopyAsset(SceneA, SceneB);
@@ -249,7 +253,7 @@ namespace Nyonyo.Dev.Editor
             EditorBuildSettings.scenes = scenes.ToArray();
         }
 
-        static RectTransform CreateUI(string name, Transform parent, params System.Type[] components)
+        private static RectTransform CreateUI(string name, Transform parent, params System.Type[] components)
         {
             var go = new GameObject(name, typeof(RectTransform));
             foreach (var component in components)
@@ -259,7 +263,7 @@ namespace Nyonyo.Dev.Editor
             return (RectTransform)go.transform;
         }
 
-        static void Stretch(RectTransform rect)
+        private static void Stretch(RectTransform rect)
         {
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
@@ -267,7 +271,7 @@ namespace Nyonyo.Dev.Editor
             rect.offsetMax = Vector2.zero;
         }
 
-        static Text CreateText(Transform parent, string name, string value, int fontSize, Vector2 position, Vector2 size)
+        private static Text CreateText(Transform parent, string name, string value, int fontSize, Vector2 position, Vector2 size)
         {
             var rect = CreateUI(name, parent, typeof(Text));
             rect.anchoredPosition = position;
@@ -283,7 +287,7 @@ namespace Nyonyo.Dev.Editor
             return text;
         }
 
-        static Button CreateButton(Transform parent, string name, string label, Vector2 position, Vector2? size = null)
+        private static Button CreateButton(Transform parent, string name, string label, Vector2 position, Vector2? size = null)
         {
             var rect = CreateUI(name, parent, typeof(Image), typeof(Button));
             rect.anchoredPosition = position;
@@ -296,14 +300,14 @@ namespace Nyonyo.Dev.Editor
             return rect.GetComponent<Button>();
         }
 
-        static void SetReference(Object target, string propertyName, Object value)
+        private static void SetReference(Object target, string propertyName, Object value)
         {
             var serialized = new SerializedObject(target);
             serialized.FindProperty(propertyName).objectReferenceValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
-        static T SavePrefab<T>(GameObject root, string path) where T : Component
+        private static T SavePrefab<T>(GameObject root, string path) where T : Component
         {
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, path);
             Object.DestroyImmediate(root);

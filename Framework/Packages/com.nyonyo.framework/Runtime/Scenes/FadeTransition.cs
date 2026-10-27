@@ -13,9 +13,9 @@ namespace Nyonyo.Framework.Scenes
     /// </remarks>
     public sealed class FadeTransition : ISceneTransition
     {
-        readonly Canvas _canvas;
-        readonly CanvasGroup _canvasGroup;
-        readonly float _duration;
+        private readonly Canvas _canvas;
+        private readonly CanvasGroup _canvasGroup;
+        private readonly float _duration;
 
         /// <param name="parent">페이드 오브젝트를 붙일 부모입니다. 보통 <see cref="Bootstrapper.Root"/>를 넘깁니다. null이면 DontDestroyOnLoad 오브젝트로 만듭니다.</param>
         /// <param name="color">화면을 가릴 색입니다. null이면 검은색입니다.</param>
@@ -68,7 +68,7 @@ namespace Nyonyo.Framework.Scenes
             _canvas.enabled = false;
         }
 
-        async Awaitable FadeAsync(float targetAlpha, CancellationToken cancellationToken)
+        private async Awaitable FadeAsync(float targetAlpha, CancellationToken cancellationToken)
         {
             var startAlpha = _canvasGroup.alpha;
             for (var elapsed = 0f; elapsed < _duration; elapsed += Time.unscaledDeltaTime)

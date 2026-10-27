@@ -57,7 +57,7 @@ namespace Nyonyo.Framework.Editor.UI
             return builder.ToString();
         }
 
-        static void Visit(Transform parent, UIPrefixSettings settings, List<UIBinding> bindings, HashSet<string> fieldNames)
+        private static void Visit(Transform parent, UIPrefixSettings settings, List<UIBinding> bindings, HashSet<string> fieldNames)
         {
             foreach (Transform child in parent)
             {
@@ -68,7 +68,7 @@ namespace Nyonyo.Framework.Editor.UI
             }
         }
 
-        static void TryAdd(GameObject target, UIPrefixSettings settings, List<UIBinding> bindings, HashSet<string> fieldNames)
+        private static void TryAdd(GameObject target, UIPrefixSettings settings, List<UIBinding> bindings, HashSet<string> fieldNames)
         {
             var rule = settings.FindRule(target.name);
             if (rule == null)

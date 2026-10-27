@@ -5,9 +5,9 @@ namespace Nyonyo.Framework.Editor.Tests
 {
     public class ServicesTests
     {
-        interface ITestService { }
+        private interface ITestService { }
 
-        class TestService : ITestService { }
+        private class TestService : ITestService { }
 
         [TearDown]
         public void TearDown() => Services.SetRegistry(null);

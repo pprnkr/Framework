@@ -44,14 +44,14 @@ namespace Nyonyo.Framework
             }
         }
 
-        static bool IsEngineAssembly(string name) =>
+        private static bool IsEngineAssembly(string name) =>
             name == "mscorlib" || name == "netstandard" ||
             name.StartsWith("System", StringComparison.Ordinal) ||
             name.StartsWith("Unity", StringComparison.Ordinal) ||
             name.StartsWith("Mono.", StringComparison.Ordinal) ||
             name.StartsWith("nunit", StringComparison.OrdinalIgnoreCase);
 
-        static bool IsTestAssembly(Assembly assembly)
+        private static bool IsTestAssembly(Assembly assembly)
         {
             foreach (var reference in assembly.GetReferencedAssemblies())
             {

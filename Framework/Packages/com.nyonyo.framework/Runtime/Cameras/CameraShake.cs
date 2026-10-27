@@ -19,22 +19,22 @@ namespace Nyonyo.Framework.Cameras
     public sealed class CameraShake : MonoBehaviour
     {
         [Tooltip("세기가 1일 때 최대 흔들림 거리(월드 단위)입니다.")]
-        [SerializeField] Vector2 _maxOffset = new(0.4f, 0.4f);
+        [SerializeField] private Vector2 _maxOffset = new(0.4f, 0.4f);
 
         [Tooltip("흔들림 속도입니다.")]
-        [SerializeField] float _frequency = 25f;
+        [SerializeField] private float _frequency = 25f;
 
         [Tooltip("초당 줄어드는 세기입니다.")]
-        [SerializeField] float _decayPerSecond = 1.5f;
+        [SerializeField] private float _decayPerSecond = 1.5f;
 
         [Tooltip("true면 일시정지(timeScale 0) 중에도 흔들림이 줄어듭니다.")]
-        [SerializeField] bool _unscaledTime = true;
+        [SerializeField] private bool _unscaledTime = true;
 
-        float _trauma;
-        float _seed;
-        Vector3 _basePosition;
-        Vector3 _lastWritten;
-        bool _hasLast;
+        private float _trauma;
+        private float _seed;
+        private Vector3 _basePosition;
+        private Vector3 _lastWritten;
+        private bool _hasLast;
 
         /// <summary>현재 흔들림 세기(0~1)입니다.</summary>
         public float Trauma => _trauma;
@@ -54,9 +54,9 @@ namespace Nyonyo.Framework.Cameras
                 shake.AddTrauma(trauma);
         }
 
-        void Awake() => _seed = Random.Range(0f, 100f);
+        private void Awake() => _seed = Random.Range(0f, 100f);
 
-        void OnDisable()
+        private void OnDisable()
         {
             if (_hasLast && transform.localPosition == _lastWritten)
                 transform.localPosition = _basePosition;
@@ -64,7 +64,7 @@ namespace Nyonyo.Framework.Cameras
             _trauma = 0f;
         }
 
-        void LateUpdate()
+        private void LateUpdate()
         {
             // 지난 프레임에 쓴 위치가 그대로면 흔들림을 걷어낸 원래 위치를, 다른 스크립트가 옮겼으면 그 위치를 기준으로 삼습니다.
             var current = transform.localPosition;
@@ -79,7 +79,7 @@ namespace Nyonyo.Framework.Cameras
             transform.localPosition = _lastWritten;
         }
 
-        Vector2 Offset(float time)
+        private Vector2 Offset(float time)
         {
             var shake = _trauma * _trauma;
             if (shake <= 0f)

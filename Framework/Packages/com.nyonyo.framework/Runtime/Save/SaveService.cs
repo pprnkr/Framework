@@ -16,20 +16,20 @@ namespace Nyonyo.Framework.Save
     /// </remarks>
     public sealed class SaveService
     {
-        const string MetaKey = "__meta";
+        private const string MetaKey = "__meta";
 
-        static readonly Regex s_keyPattern = new("^[A-Za-z0-9_.-]+$");
+        private static readonly Regex s_keyPattern = new("^[A-Za-z0-9_.-]+$");
 
         [Serializable]
-        sealed class SlotMeta
+        private sealed class SlotMeta
         {
             public long lastSavedUtcTicks;
             public List<string> keys = new();
         }
 
-        readonly ISaveStorage _storage;
-        readonly ISaveSerializer _serializer;
-        int _currentSlot;
+        private readonly ISaveStorage _storage;
+        private readonly ISaveSerializer _serializer;
+        private int _currentSlot;
 
         /// <summary>
         /// 서비스로 등록된 SaveService입니다. <c>Services.Get&lt;SaveService&gt;()</c>와 같습니다.
@@ -61,7 +61,7 @@ namespace Nyonyo.Framework.Save
         /// <summary>
         /// 플랫폼에 맞는 기본 저장소입니다. WebGL이면 <see cref="PlayerPrefsSaveStorage"/>, 그 밖에는 <see cref="FileSaveStorage"/>입니다.
         /// </summary>
-        public static ISaveStorage CreateDefaultStorage()
+        private ISaveStorage CreateDefaultStorage()
         {
 #if UNITY_WEBGL && !UNITY_EDITOR
             return new PlayerPrefsSaveStorage();
@@ -186,7 +186,7 @@ namespace Nyonyo.Framework.Save
         }
 
         // 슬롯에 어떤 키가 있는지 따로 기록해 둡니다. PlayerPrefs는 키 목록을 조회할 수 없기 때문입니다.
-        void UpdateMeta(int slot, string key, bool saved)
+        private void UpdateMeta(int slot, string key, bool saved)
         {
             var meta = ReadMeta(slot) ?? new SlotMeta();
             if (saved)
@@ -206,7 +206,7 @@ namespace Nyonyo.Framework.Save
                 _storage.Write(SlotMetaKey(slot), _serializer.Serialize(meta));
         }
 
-        SlotMeta ReadMeta(int slot)
+        private SlotMeta ReadMeta(int slot)
         {
             if (!_storage.TryRead(SlotMetaKey(slot), out var text))
                 return null;
@@ -222,7 +222,7 @@ namespace Nyonyo.Framework.Save
             }
         }
 
-        static bool Migrate(IVersionedSaveData data, string fullKey)
+        private bool Migrate(IVersionedSaveData data, string fullKey)
         {
             var saved = data.Version;
             var latest = data.LatestVersion;
@@ -242,13 +242,13 @@ namespace Nyonyo.Framework.Save
             return true;
         }
 
-        string FullKey(string key, SaveScope scope) => scope == SaveScope.Global ? $"global.{key}" : SlotKey(_currentSlot, key);
+        private string FullKey(string key, SaveScope scope) => scope == SaveScope.Global ? $"global.{key}" : SlotKey(_currentSlot, key);
 
-        static string SlotKey(int slot, string key) => $"slot{slot}.{key}";
+        private string SlotKey(int slot, string key) => $"slot{slot}.{key}";
 
-        static string SlotMetaKey(int slot) => SlotKey(slot, MetaKey);
+        private string SlotMetaKey(int slot) => SlotKey(slot, MetaKey);
 
-        static void ValidateKey(string key)
+        private void ValidateKey(string key)
         {
             if (string.IsNullOrEmpty(key) || !s_keyPattern.IsMatch(key))
                 throw new ArgumentException($"저장 키 '{key}'에는 영문, 숫자, _ . -만 쓸 수 있습니다.", nameof(key));

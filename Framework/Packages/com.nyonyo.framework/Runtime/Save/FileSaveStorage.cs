@@ -13,10 +13,10 @@ namespace Nyonyo.Framework.Save
     /// </remarks>
     public sealed class FileSaveStorage : ISaveStorage
     {
-        const string Extension = ".json";
-        const string TempExtension = ".json.tmp";
+        private const string Extension = ".json";
+        private const string TempExtension = ".json.tmp";
 
-        static readonly Encoding s_encoding = new UTF8Encoding(false);
+        private static readonly Encoding s_encoding = new UTF8Encoding(false);
 
         public FileSaveStorage(string folder = null)
         {
@@ -60,6 +60,6 @@ namespace Nyonyo.Framework.Save
             File.Delete(PathOf(key, TempExtension));
         }
 
-        string PathOf(string key, string extension) => Path.Combine(Folder, key + extension);
+        private string PathOf(string key, string extension) => Path.Combine(Folder, key + extension);
     }
 }
