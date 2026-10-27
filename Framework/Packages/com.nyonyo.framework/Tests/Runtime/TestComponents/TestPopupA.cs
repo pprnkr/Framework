@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Nyonyo.Framework.UI;
 using UnityEngine.UI;
 
-namespace Nyonyo.Framework.Editor.Tests
+namespace Nyonyo.Framework.Tests
 {
     public class TestPopupA : PopupBase
     {

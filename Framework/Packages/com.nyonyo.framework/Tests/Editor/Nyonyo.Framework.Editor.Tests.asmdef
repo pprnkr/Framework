@@ -6,6 +6,7 @@
         "UnityEditor.TestRunner",
         "Nyonyo.Framework",
         "Nyonyo.Framework.Editor",
+        "Nyonyo.Framework.Tests",
         "UnityEngine.UI",
         "Unity.InputSystem"
     ],

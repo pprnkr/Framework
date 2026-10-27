@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Nyonyo.Framework.UI;
 
-namespace Nyonyo.Framework.Editor.Tests
+namespace Nyonyo.Framework.Tests
 {
     public class TestChildUI : UIBase
     {

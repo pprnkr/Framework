@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using Nyonyo.Framework.Pooling;
 using UnityEngine;
 
-namespace Nyonyo.Framework.Editor.Tests
+namespace Nyonyo.Framework.Tests
 {
     public class TestPoolable : MonoBehaviour, IPoolable
     {

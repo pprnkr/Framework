@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Nyonyo.Framework.Pooling;
+using Nyonyo.Framework.Tests;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;

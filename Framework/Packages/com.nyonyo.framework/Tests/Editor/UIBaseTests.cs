@@ -1,3 +1,4 @@
+using Nyonyo.Framework.Tests;
 using NUnit.Framework;
 using UnityEngine;
 

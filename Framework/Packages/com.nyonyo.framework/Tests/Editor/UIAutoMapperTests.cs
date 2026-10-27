@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Nyonyo.Framework.Assets;
 using Nyonyo.Framework.Editor.UI;
+using Nyonyo.Framework.Tests;
 using Nyonyo.Framework.UI;
 using NUnit.Framework;
 using UnityEngine;

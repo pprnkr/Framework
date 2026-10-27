@@ -13,3 +13,4 @@ MonoBehaviour:
   m_Name: DevInstaller
   m_EditorClassIdentifier: Assembly-CSharp::Nyonyo.Dev.DevInstaller
   _uiSettings: {fileID: 11400000, guid: c416148aeb848e240be2b38bfec041f8, type: 2}
+  _soundSettings: {fileID: 11400000, guid: 19609f208fcf23e43ad2d26f6081462a, type: 2}

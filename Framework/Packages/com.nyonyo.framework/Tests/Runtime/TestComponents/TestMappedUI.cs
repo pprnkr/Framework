@@ -2,7 +2,7 @@ using Nyonyo.Framework.UI;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace Nyonyo.Framework.Editor.Tests
+namespace Nyonyo.Framework.Tests
 {
     public class TestMappedUI : UIBase
     {

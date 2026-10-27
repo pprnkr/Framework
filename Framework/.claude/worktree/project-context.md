@@ -327,7 +327,9 @@ Packages/com.nyonyo.framework/
 ### 테스트 (`Tests/Editor/`)
 
 - **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 25개, `UIBaseTests` 2개, `UIAutoMapperTests` 16개, `SoundManagerTests` 16개, `SaveServiceTests` 15개, `PoolManagerTests` 8개, `StateMachineTests` 7개, `TimingTests` 11개, `TweenTests` 5개, `InputServiceTests` 5개, `DataTableTests` 7개, `GameplayTests` 10개, `DebuggingTests` 8개(Unity 검증 안 됨, 총 175개).
-- **스크립트 실행 주의:** compile-check.ps1 실행 결과에 `| Select-Object -First N`을 붙이면 파이프라인이 멈춥니다. 그냥 실행하세요. `FakeAssetLoader`(Tests/Editor)는 로드와 반환을 기록하는 가짜 로더입니다. 실제 Addressables 로드와 `AssetLoader`는 자동 테스트가 없습니다.
+- **스크립트 실행 주의:** compile-check.ps1 실행 결과에 `| Select-Object -First N`을 붙이면 파이프라인이 멈춥니다. 그냥 실행하세요.
+- **테스트용 MonoBehaviour 위치(2026-10-27 실패에서 배움):** Editor 전용 어셈블리의 MonoBehaviour는 `AddComponent`할 수 없습니다("Can't add script behaviour ... because it is an editor script"). 그래서 테스트용 컴포넌트는 런타임 테스트 어셈블리 `Tests/Runtime/TestComponents/`(네임스페이스 `Nyonyo.Framework.Tests`)에 둡니다. Editor 테스트 asmdef가 이 어셈블리를 참조합니다. ScriptableObject(`TestItemTable`)는 Editor 어셈블리에 있어도 됩니다. 외부 컴파일로는 잡을 수 없는 문제입니다.
+- **PowerShell로 파일을 수정하지 말 것(2026-10-27 사고):** PowerShell 5.1의 `Get-Content -Raw`는 BOM 없는 UTF-8을 CP949로 읽어서 한글을 깨뜨립니다. 소스 파일 수정은 반드시 Edit/Write 도구로 하세요. 이번에 깨진 테스트 파일 4개는 git checkout으로 되돌렸습니다. `FakeAssetLoader`(Tests/Editor)는 로드와 반환을 기록하는 가짜 로더입니다. 실제 Addressables 로드와 `AssetLoader`는 자동 테스트가 없습니다.
 - **asmdef 참조 수정:** 테스트 asmdef에 빠져 있던 `UnityEngine.UI` 참조를 2026-10-27에 추가했습니다.. `FadeTransition`과 뒤로가기 키 입력은 자동 테스트가 없습니다. 테스트용 팝업은 `Tests/Editor/TestPopups/`에 둡니다(파일 하나에 클래스 하나).
 - **SceneService 테스트 방식:** 가짜 `ISceneLoader`와 `ISceneTransition`을 넣고, 즉시 완료되는 Awaitable로 동기 검증합니다.
 - **의도된 에러 로그:** `EventBusTests`의 `handler failed` 예외 로그도 `LogAssert.Expect`로 검증하는 의도된 로그입니다.
