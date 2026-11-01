@@ -1,6 +1,6 @@
 {
   "name": "com.nyonyo.framework",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "displayName": "Nyonyo Framework",
   "description": "Unity 2D 게임 개발을 위한 공용 프레임워크.",
   "unity": "6000.3",

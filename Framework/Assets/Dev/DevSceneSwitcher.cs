@@ -1,6 +1,7 @@
 using System.IO;
 using Nyonyo.Framework;
 using Nyonyo.Framework.Audio;
+using Nyonyo.Framework.Auth;
 using Nyonyo.Framework.Debugging;
 using Nyonyo.Framework.Events;
 using Nyonyo.Framework.Logging;
@@ -59,7 +60,29 @@ namespace Nyonyo.Dev
             DrawSave(save);
             GUILayout.Space(10);
             DrawTools();
+            GUILayout.Space(10);
+            DrawAuth();
             GUILayout.EndArea();
+        }
+
+        private void DrawAuth()
+        {
+            if (!Services.TryGet(out IAuthService auth))
+                return;
+
+            var user = auth.CurrentUser;
+            GUILayout.Label(user == null ? "Auth: signed out" : $"Auth: {user}");
+            using (new GUILayout.HorizontalScope())
+            {
+                if (user == null && GUILayout.Button("Guest"))
+                    auth.SignIn(AuthProvider.Guest, result => Debug.Log($"[Dev] Guest sign in: {result}"));
+                if (GUILayout.Button("Link Google"))
+                    auth.Link(AuthProvider.Google, result => Debug.Log($"[Dev] Link Google: {result}"));
+                if (GUILayout.Button("Google"))
+                    auth.SignIn(AuthProvider.Google, result => Debug.Log($"[Dev] Google sign in: {result}"));
+                if (user != null && GUILayout.Button("Sign out"))
+                    auth.SignOut();
+            }
         }
 
         private void DrawTools()

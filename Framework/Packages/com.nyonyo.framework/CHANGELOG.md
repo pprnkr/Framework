@@ -3,6 +3,13 @@
 이 패키지의 변경 사항을 기록합니다. 버전 규칙은 [Semantic Versioning](https://semver.org/lang/ko/)을 따릅니다.
 버전은 패키지마다 따로 관리하고, 이 패키지가 바뀌었을 때만 올립니다. git 태그는 `core/v버전`입니다(예: `core/v0.2.0`).
 
+## [0.2.1] - 2026-11-01
+
+### Added
+- 로그인: `IAuthService`(`SignInAsync`, `LinkAsync`, `SignOut`, `DeleteAccountAsync`, `GetIdTokenAsync`, `UserChanged`), `AuthProvider`(Guest, Google, Apple), `AuthResult`, `AuthUser`, 콜백형 확장 `SignIn`/`Link`/`DeleteAccount`.
+- `AuthServiceBase`: 시작할 때 게스트 로그인, 한 번에 하나의 작업, 시작 대기, 이벤트 예외 격리. 로그인 모듈(`com.nyonyo.framework.firebase`)이 상속합니다.
+- `FakeAuthService`(에디터, 가짜 로그인 창), `NullAuthService`(WebGL, PC, 기기 안의 게스트 계정).
+
 ## [0.2.0] - 2026-11-01
 
 ### Added

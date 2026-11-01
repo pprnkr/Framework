@@ -42,25 +42,26 @@
 | 표시 이름 / 작성자 | `Nyonyo Framework` / `Nyonyo` |
 | 어셈블리 / 네임스페이스 | `Nyonyo.Framework` (PascalCase) |
 | GitHub 계정 | `pprnkr` 유지. `nyonyo`는 다른 사람이 이미 쓰는 계정이라 바꿀 수 없음 |
-| 설치 URL | `https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.0` (AdMob은 `...com.nyonyo.framework.admob#admob/v0.1.0`) |
+| 설치 URL | `https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.1` (AdMob은 `...com.nyonyo.framework.admob#admob/v0.1.0`, Firebase는 `...com.nyonyo.framework.firebase#firebase/v0.1.0`) |
 | 의존성 관리 방식 | 서비스 로케이터. 싱글톤은 쓰지 않고, DI 프레임워크(VContainer, Zenject)는 무거워서 보류 |
 | 비동기 | Unity 내장 `Awaitable` 사용. UniTask 같은 외부 의존성은 쓰지 않음 |
 | 부트스트랩 방식 | `RuntimeInitializeOnLoadMethod`로 자동 시작. Boot 씬은 쓰지 않음 |
 | 서비스 스코프 | 지금은 전역 서비스만. 씬 스코프 서비스는 나중에 필요할 때 추가 |
 | 화면 방향 | 세로형이 기본(1080x1920). 게임마다 `UISettings.Orientation` enum으로 정함 (2026-10-27 사용자 요청) |
 | 서드파티 모듈 | 네이티브 SDK나 빌드 설정이 필요한 서드파티(AdMob, Firebase, 로그인 등)는 같은 저장소의 별도 패키지 `com.nyonyo.framework.<이름>`으로 분리. 인터페이스와 가짜/Null 구현은 코어에 둠. 가벼운 Unity 공식 패키지는 코어 안에서 `versionDefines`로 선택 컴파일 (2026-10-27 사용자 동의) |
-| 모듈 버전 | **패키지마다 따로** (2026-11-01 사용자 결정, 이전의 "같은 태그로 함께 올림"을 대체). 바뀐 것이 있을 때만 그 패키지 버전을 올려서 게임이 다시 임포트하게 함(사용자 원칙). 태그도 패키지별(`core/v0.2.0`, `admob/v0.1.0`). 모듈이 새 코어 기능을 쓰게 되면 모듈의 `com.nyonyo.framework` 의존성 최소 버전을 올림. 코어에 깨지는 변경이 생기면 그 API를 쓰는 모듈을 함께 고치고 올림. UPM은 package.json 의존성에 git URL을 못 쓰므로 게임 manifest에 코어와 모듈을 모두 적음 |
+| 모듈 버전 | **패키지마다 따로** (2026-11-01 사용자 결정, 이전의 "같은 태그로 함께 올림"을 대체). 바뀐 것이 있을 때만 그 패키지 버전을 올려서 게임이 다시 임포트하게 함(사용자 원칙). 태그도 패키지별(`core/v0.2.1`, `admob/v0.1.0`, `firebase/v0.1.0`). 모듈이 새 코어 기능을 쓰게 되면 모듈의 `com.nyonyo.framework` 의존성 최소 버전을 올림. 코어에 깨지는 변경이 생기면 그 API를 쓰는 모듈을 함께 고치고 올림. UPM은 package.json 의존성에 git URL을 못 쓰므로 게임 manifest에 코어와 모듈을 모두 적음 |
 
 README의 설치 URL에 남은 `pprnkr`는 실제 저장소 주소라서 일부러 그대로 둔 것입니다. 바꾸면 설치가 깨집니다.
 
 **출시 절차 (패키지별 버전)**
-1. 마지막 태그 이후 바뀐 패키지를 확인합니다: `git -C .. log --oneline core/v0.2.0..HEAD -- Framework/Packages/com.nyonyo.framework` (AdMob은 `admob/v…`와 그 폴더).
+1. 마지막 태그 이후 바뀐 패키지를 확인합니다: `git -C .. log --oneline core/v0.2.1..HEAD -- Framework/Packages/com.nyonyo.framework` (AdMob은 `admob/v…`, Firebase는 `firebase/v…`와 그 폴더).
 2. 바뀐 패키지만 `package.json`의 `version`을 올리고 그 패키지 `CHANGELOG.md`에 `## [버전] - 날짜`를 적습니다. 0.x 동안 깨지는 변경은 가운데 숫자, 나머지는 끝 숫자를 올립니다.
 3. 모듈이 새 코어 기능을 쓰면 모듈 `package.json`의 `com.nyonyo.framework` 최소 버전도 올립니다.
 4. 새 파일의 `.meta`가 모두 있는지 확인합니다. git 패키지는 읽기 전용이라 `.meta` 없는 파일은 게임에서 무시됩니다.
 5. 커밋하고 바뀐 패키지만 태그를 만듭니다(`git tag core/v0.3.0`). 푸시는 사용자가 `git push origin main --tags`로 합니다.
 6. 게임 manifest에서 그 패키지 URL의 `#` 뒤 태그만 바꿉니다.
 - **첫 태그(2026-11-01):** 그때까지 태그가 하나도 없었습니다(README의 `#v0.1.0`도 실제로는 없었음). 레드닷과 Config 시트를 넣은 커밋에 `core/v0.2.0`, 같은 커밋에 `admob/v0.1.0`(AdMob 코드는 처음 추가 이후 변경 없음)을 붙였습니다.
+- **로그인 추가(2026-11-01):** 코어 `core/v0.2.1`(Auth 추가, 깨지는 변경 없음)과 새 모듈 `firebase/v0.1.0`. AdMob은 바뀐 것이 없어 그대로입니다(AdMob README 예시의 `#core/v0.2.0`도 손대지 않음, 이 모듈의 코어 최소 버전은 0.1.0).
 
 ## 패키지 구조
 
@@ -78,6 +79,12 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
 ├── Runtime/                Nyonyo.Framework.AdMob (네임스페이스 Nyonyo.Framework.Ads.AdMob)
 ├── Editor/                 Nyonyo.Framework.AdMob.Editor
 └── Tests/Editor/           Nyonyo.Framework.AdMob.Editor.Tests
+
+Packages/com.nyonyo.framework.firebase/ 선택 모듈 (의존성: 코어 0.2.1만. Firebase SDK는 게임이 tgz로 설치)
+├── Runtime/                Nyonyo.Framework.Firebase (versionDefine NYONYO_FIREBASE_AUTH)
+│   └── Plugins/            Android/GoogleSignInBridge.java, iOS/NyonyoAppleSignIn.mm
+├── Editor/                 Nyonyo.Framework.Firebase.Editor (+ NyonyoFirebaseDependencies.xml)
+└── Tests/Editor/           Nyonyo.Framework.Firebase.Editor.Tests
 ```
 
 개발 프로젝트 manifest에 OpenUPM 스코프 레지스트리(`com.google.ads.mobile`만)를 추가했습니다. 이게 없으면 admob 모듈의 의존성을 풀지 못해 패키지 해석 전체가 실패합니다.
@@ -102,6 +109,7 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
 | 11 | 게임 데이터: 구글 시트 → partial 클래스 생성 + 암호화 `.bytes` (기존 Data 교체) | 완료 (.NET 하네스로 테스트 29개 실행, 생성 코드 컴파일과 로드 확인. 실제 구글 시트 내려받기와 Unity는 확인 안 됨) |
 | 12 | 레드닷 (`Reddot`, `ReddotObject<TType>`, 게임 enum) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
 | 13 | 게임 데이터 Config 시트 (머리글 Type, Key, Value, `ConfigTableBase`) | 완료 (.NET 하네스 테스트와 생성 코드 컴파일·로드 확인, Unity 검증 안 됨) |
+| 14 | 로그인: 코어 `IAuthService` + Firebase 모듈(게스트, 구글/애플 연결, 계정 삭제) | 완료 (Firebase 14.1.0 DLL로 에디터·Android·iOS·WebGL 컴파일, Java 브리지는 실제 라이브러리로 javac 확인. Unity, Objective-C, 기기 검증 안 됨) |
 | **다음** | **배포 레벨(DEV/SERVICE)과 빌드 메뉴(Tools/Build)** | **검토만 완료, 구현 전.** 아래 "다음 할 일" 절 참고 |
 | - | Localization, Cinemachine 연동 | 보류: 패키지 도입 여부를 사용자가 정해야 함 |
 
@@ -418,6 +426,39 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
 - **검증:** compile-check.ps1에 AdMob 패스를 추가했습니다. PackageCache에 없으면 scratchpad `admob-pkg/`에 받은 11.6.0 tarball DLL을 씁니다. Unity Play 모드와 실제 기기 광고는 확인하지 못했습니다.
 - **보류:** 미디에이션, 네이티브 광고, 보상형 전면, 연령 제한 설정(`AgeRestrictedTreatment`), Dev 샘플 연결(다른 세션이 Dev 파일을 수정 중이라 건드리지 않음).
 
+## 구현 완료: 로그인 (2026-11-01)
+
+사용자 요청: "파이어베이스 Auth 시스템을 구현하고 싶다". 모듈 분리에 동의했고, 제가 낸 추천안 네 가지를 모두 골랐습니다.
+- **로그인 방식:** 게스트(익명)로 시작하고 구글(Android)이나 애플(iOS) 계정을 연결합니다.
+- **패키지:** `firebase` 패키지 하나에 Auth부터 넣습니다. Analytics 같은 다른 Firebase 제품도 나중에 여기에 추가합니다.
+- **WebGL:** Null 구현(기기 안의 게스트)이고, 웹 로그인이 필요한 게임이 생기면 JS SDK를 연동합니다.
+- **DEV와 SERVICE:** Firebase 프로젝트를 따로 씁니다. 설정 파일 교체는 배포 레벨 작업에서 합니다(아래 "다음 할 일" 표).
+
+**코어 (`Runtime/Auth/`, `Nyonyo.Framework.Auth`)**
+
+| 타입 | 역할 |
+|---|---|
+| `IAuthService` | `SignInAsync(provider)`(게스트는 이미 로그인됐으면 그대로), `LinkAsync`, `SignOut`, `DeleteAccountAsync`, `GetIdTokenAsync`, `WaitUntilInitializedAsync`, `IsProviderSupported`, `CurrentUser`, `IsBusy`, `Initialized`/`UserChanged`(로그아웃은 null) |
+| `AuthProvider` / `AuthResult` / `AuthUser` | Guest, Google, Apple / Success, Cancelled, NotSupported, NotSignedIn, AlreadyInUse, RequiresRecentSignIn, NetworkError, Busy, Failed / UserId, IsGuest(연결 계정 없음), LinkedProviders, DisplayName, Email |
+| `AuthServiceBase` | `IInitializable`(게임 시작을 막지 않음): InitializeCore → 로그인 없으면 게스트 로그인(옵션) → Initialized. 작업은 한 번에 하나(Busy), 시작 전 요청은 시작을 기다림, 예외는 LogException 후 Failed, 이벤트 예외 격리. 로그아웃과 삭제 성공 뒤 `SetUser(null)`은 기반이 함 |
+| `FakeAuthService` / `FakeAuthView` | 에디터. 게스트는 바로 성공, 구글/애플은 IMGUI 창에서 결과 선택(테스트는 internal `Respond`). 어느 구글/애플 계정이 어느 게임 계정에 연결됐는지 기억해서 AlreadyInUse와 계정 복귀를 흉내 냄. `auth.fake` 전역 키 |
+| `NullAuthService` | WebGL, PC. 기기 안의 게스트(`local-` + GUID, `auth.local` 전역 키), 토큰 null |
+| `AuthServiceExtensions` | 콜백형 `SignIn`, `Link`, `DeleteAccount` |
+
+**Firebase 모듈 (`Packages/com.nyonyo.framework.firebase/`, 네임스페이스 `Nyonyo.Framework.Firebase`)**
+- **SDK 설치 방식(조사 결과):** Firebase Unity SDK는 Unity 레지스트리, OpenUPM, 예전 Google 레지스트리(`unityregistry-pa.googleapis.com`, 404) 어디에도 없습니다. 공식 방법은 `developers.google.com/unity/archive`의 tgz를 게임 manifest에 `file:`로 넣는 것입니다. 그래서 모듈 package.json에 Firebase 의존성을 넣지 않고, asmdef `versionDefines`(`com.google.firebase.auth` 14.0.0 이상 → `NYONYO_FIREBASE_AUTH`)로 SDK가 있을 때만 Firebase 코드를 컴파일합니다. 개발 프로젝트에도 SDK(App tgz 61MB)를 넣지 않았습니다.
+- **EDM 충돌:** Firebase App 14.1.0은 구버전 `com.google.external-dependency-manager` 1.2.190(deprecated)에 의존하고, AdMob은 `com.unity.external-dependency-manager` 2.1.0을 씁니다. Unity EDM 소스(`EDMInstancesHandling.cs`)에 구버전을 감지해 선택 창을 띄우고 더미 패키지로 바꾸는 처리가 있습니다. 실제 게임 프로젝트에서는 확인하지 못했습니다.
+- **WebGL:** Firebase DLL이 WebGL에서 꺼져 있어서(meta) `FirebaseAuthService.cs` 전체가 `#if NYONYO_FIREBASE_AUTH && !UNITY_WEBGL`입니다.
+- **이름 충돌:** `Firebase.Auth.AuthResult`(클래스)와 겹쳐서 모듈 안에서는 `using AuthResult = Nyonyo.Framework.Auth.AuthResult;`를 씁니다. 네임스페이스 `Nyonyo.Framework.Firebase` 안에서는 `Firebase.` 접두어가 이 네임스페이스로 해석되므로 SDK 타입은 파일 맨 위 using으로만 씁니다.
+- **`FirebaseAuthService`:** `CheckAndFixDependenciesAsync` → `FirebaseAuth.DefaultInstance` → `StateChanged` 구독(메인 스레드로 옮겨 SetUser). 게스트 `SignInAnonymouslyAsync`, 구글/애플은 `SignInAndRetrieveDataWithCredentialAsync`, 연결은 `LinkWithCredentialAsync`. `FirebaseAccountLinkException.UserInfo.UpdatedCredential`을 기억해 두었다가 바로 이은 같은 방식 SignIn에 씁니다(창 다시 안 띄움). `AuthError` → `AuthResult` 변환. API는 14.1.0 DLL을 MetadataLoadContext로 덤프해서 확인했습니다.
+- **구글(Android):** `GoogleSignInBridge.java`(Credential Manager `GetSignInWithGoogleOption`, UI 스레드, `@Keep`) + `GoogleSignInAndroid.cs`(`AndroidJavaProxy`, `[Preserve] onCompleted`, `TaskCompletionSource`로 메인 스레드 복귀). 웹 클라이언트 ID는 비어 있으면 Firebase가 만든 리소스 `default_web_client_id`. 의존성은 `Editor/NyonyoFirebaseDependencies.xml`(credentials 1.5.0, credentials-play-services-auth 1.5.0, googleid 1.1.1, annotation 1.9.1).
+- **애플(iOS):** `NyonyoAppleSignIn.mm`(AuthenticationServices, ARC, delegate를 static set으로 붙잡음, `UnityGetMainWindow`) + `AppleSignInIOS.cs`(`[DllImport("__Internal")]`, `[MonoPInvokeCallback]` static 콜백, nonce는 C#에서 생성하고 SHA-256 hex를 애플에, 원래 값을 Firebase에). `AppleSignInCapability`(`#if UNITY_IOS`, `ProjectCapabilityManager.AddSignInWithApple`)가 빌드 후 권한을 넣습니다.
+- **`FirebaseSettings`:** SignInAsGuestOnStart, GoogleSignIn, GoogleWebClientId, AppleSignIn, AuthEditorMode(Fake 기본/Firebase). `CreateAuthService`: 에디터는 모드대로, Android/iOS는 Firebase(SDK 없으면 LogError 후 Null), 그 밖은 Null.
+- **에디터:** 설정 메뉴(priority 61), 인스펙터(SDK 설치, 설정 파일 상태, 콘솔 안내), `FirebaseBuildCheck`(Android/iOS, FirebaseSettings가 있는 프로젝트만: SDK 없음 경고, 설정 파일 없음 에러).
+- **검증:** compile-check.ps1에 Firebase 패스 8개(SDK 없음/있음, Android·iOS·WebGL 플레이어, 에디터 2, 테스트) 추가, 모두 에러 0. scratchpad `firebase-pkg/`에 14.1.0 tgz를 풀어 둠. Java는 Unity Android 모듈의 javac와 android-35, 실제 AAR로 컴파일 확인(이번 세션 scratchpad `java-libs/`). `AuthServiceTests`는 Unity 네이티브 호출(ECall) 때문에 .NET 하네스로 실행할 수 없습니다(하네스에 `TEST_CLASSES` 환경 변수와 TearDown 호출을 추가함).
+- **Dev 샘플:** DevInstaller가 `FakeAuthService`를 등록하고, DevSceneSwitcher에 Auth 줄(계정 표시, Guest, Link Google, Google, Sign out)을 추가했습니다.
+- **보류:** 이메일 로그인, Google Play 게임즈 로그인, iOS 구글 로그인, 웹(JS SDK) 로그인, 재인증 후 삭제 자동화, Firebase의 다른 제품.
+
 ## 구현 완료: 게임 데이터 (2026-10-27, `Runtime/Data/`, `Editor/Data/`)
 
 사용자 요청: 구글 스프레드시트에서 데이터를 가져와 클래스를 생성하는 기능입니다. 생성 클래스는 게임 폴더에 모이는 partial이고, 데이터는 AOT에서 가장 빠르게 읽히고 암호화되어야 합니다.
@@ -478,7 +519,7 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
 
 ### 테스트 (`Tests/Editor/`)
 
-- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 29개, `UIViewTests` 4개, `UIAutoMapperTests` 16개, `SoundManagerTests` 19개, `UISettingsTests` 5개, `SaveServiceTests` 15개, `PoolManagerTests` 8개, `StateMachineTests` 7개, `TimingTests` 11개, `TweenTests` 39개, `InputServiceTests` 5개, `GameplayTests` 10개, `DebuggingTests` 8개, `AdServiceTests` 17개, AdMob 모듈 `AdMobSettingsTests` 3개(Unity 검증 안 됨), 게임 데이터 `SheetTableParserTests` 20개, `XlsxReaderTests` 4개, `GameDataTests` 10개, `GameDataCodeGeneratorTests` 3개, `ServiceAccountTests` 5개(.NET 하네스로 실제 실행해 42개 통과, Unity Test Runner는 아직), `ReddotTests` 7개(Unity 검증 안 됨). 총 278개.
+- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 29개, `UIViewTests` 4개, `UIAutoMapperTests` 16개, `SoundManagerTests` 19개, `UISettingsTests` 5개, `SaveServiceTests` 15개, `PoolManagerTests` 8개, `StateMachineTests` 7개, `TimingTests` 11개, `TweenTests` 39개, `InputServiceTests` 5개, `GameplayTests` 10개, `DebuggingTests` 8개, `AdServiceTests` 17개, AdMob 모듈 `AdMobSettingsTests` 3개(Unity 검증 안 됨), 게임 데이터 `SheetTableParserTests` 20개, `XlsxReaderTests` 4개, `GameDataTests` 10개, `GameDataCodeGeneratorTests` 3개, `ServiceAccountTests` 5개(.NET 하네스로 실제 실행해 42개 통과, Unity Test Runner는 아직), `ReddotTests` 7개(Unity 검증 안 됨), `AuthServiceTests` 16개, Firebase 모듈 `FirebaseSettingsTests` 4개(Unity 검증 안 됨). 총 298개.
 - **스크립트 실행 주의:** compile-check.ps1 실행 결과에 `| Select-Object -First N`을 붙이면 파이프라인이 멈춥니다. 그냥 실행하세요.
 - **테스트용 MonoBehaviour 위치(2026-10-27 실패에서 배움):** Editor 전용 어셈블리의 MonoBehaviour는 `AddComponent`할 수 없습니다("Can't add script behaviour ... because it is an editor script"). 그래서 테스트용 컴포넌트는 런타임 테스트 어셈블리 `Tests/Runtime/TestComponents/`(네임스페이스 `Nyonyo.Framework.Tests`)에 둡니다. Editor 테스트 asmdef가 이 어셈블리를 참조합니다. ScriptableObject(`TestItemTable`)는 Editor 어셈블리에 있어도 됩니다. 외부 컴파일로는 잡을 수 없는 문제입니다.
 - **PowerShell로 파일을 수정하지 말 것(2026-10-27 사고):** PowerShell 5.1의 `Get-Content -Raw`는 BOM 없는 UTF-8을 CP949로 읽어서 한글을 깨뜨립니다. 소스 파일 수정은 반드시 Edit/Write 도구로 하세요. 이번에 깨진 테스트 파일 4개는 git checkout으로 되돌렸습니다. `FakeAssetLoader`(Tests/Editor)는 로드와 반환을 기록하는 가짜 로더입니다. 실제 Addressables 로드와 `AssetLoader`는 자동 테스트가 없습니다.
@@ -508,6 +549,7 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
 | 디버그 콘솔 | 세 손가락 탭 | 세 손가락 탭 | 백쿼트 / 세 손가락 탭 | 백쿼트 | `[DebugCommand]`가 `PreserveAttribute`를 상속해 IL2CPP에서도 명령이 남음 |
 | 트윈, 풀링, 타이머, FSM, 카메라, 데이터 | O | O | O | O | 스레드나 파일 입출력 없음 |
 | 광고 | AdMob | AdMob | `NullAdService` | `NullAdService` | 웹과 PC는 광고 없음. 보상형은 기본으로 광고 없이 바로 보상(끌 수 있음). 웹 광고 네트워크 연동은 실제로 붙일 게임이 생기면 진행 |
+| 로그인 | Firebase: 게스트, 구글 | Firebase: 게스트, 애플 | `NullAuthService` | `NullAuthService` | Firebase Unity SDK가 WebGL 미지원, PC(데스크톱)는 베타라 기기 안의 게스트만. 웹 로그인은 필요한 게임이 생기면 JS SDK |
 
 ## 다음 할 일: 배포 레벨(DEV/SERVICE)과 빌드 메뉴 (2026-10-27 검토, 구현 전)
 
@@ -537,6 +579,7 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
 | 저장(`SaveService`) | 레벨 구분 없음 | 같은 기기에 DEV와 SERVICE를 함께 설치하면 저장이 섞일 수 있음. 저장 폴더나 키 접두어를 레벨별로 나눌지 결정(번들 ID를 다르게 하면 불필요) |
 | 번들 ID, 앱 이름 | Player Settings 한 벌 | DEV 빌드는 `.dev` 번들 ID와 "[DEV]" 앱 이름을 쓸지 결정(같은 기기에 두 빌드 공존) |
 | `GameDataSettings`(다른 작업에서 만든 구글 시트 데이터) | 시트 주소 한 벌 | DEV와 SERVICE가 다른 시트를 쓸지 사용자에게 확인 |
+| Firebase 설정 파일(`google-services.json`, `GoogleService-Info.plist`) | Assets에 한 벌 | **DEV와 SERVICE는 다른 Firebase 프로젝트(2026-11-01 사용자 결정).** 빌드 창이 레벨별 파일을 Assets에 바꿔 넣음. 같은 이름 파일이 둘 있으면 Firebase가 고르는 쪽이 보장되지 않으므로 Assets 밖(또는 다른 이름)에 보관하고 복사하는 방식 검토. `FakeAuthService`/Firebase 에디터 모드 선택은 레벨과 무관 |
 | `UISettings`, `SoundSettings`, `UIPrefixSettings` | 레벨과 무관 | 변경 없음 |
 
 **빌드 창(Tools/Build)에 넣을 것**

@@ -9,14 +9,14 @@ Unity 2D 게임 개발을 위한 공용 프레임워크 패키지입니다.
 다른 프로젝트에서 이 패키지를 쓰려면 Package Manager에서 **Install package from git URL**을 선택하고 아래 주소를 입력합니다.
 
 ```
-https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.0
+https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.1
 ```
 
-`#core/v0.2.0` 부분은 사용할 버전의 git 태그입니다.
+`#core/v0.2.1` 부분은 사용할 버전의 git 태그입니다.
 
 ### 버전과 업데이트
 
-- **패키지별 버전:** 코어와 선택 모듈(예: AdMob)은 버전을 따로 관리하고, **바뀐 패키지만** 버전을 올립니다. 태그도 패키지별입니다(코어 `core/v0.2.0`, AdMob `admob/v0.1.0`).
+- **패키지별 버전:** 코어와 선택 모듈(AdMob, Firebase)은 버전을 따로 관리하고, **바뀐 패키지만** 버전을 올립니다. 태그도 패키지별입니다(코어 `core/v0.2.1`, AdMob `admob/v0.1.0`, Firebase `firebase/v0.1.0`).
 - **업데이트 받기:** 게임의 `Packages/manifest.json`에서 그 패키지 URL의 `#` 뒤 태그를 새 버전으로 바꾸면 Unity가 다시 받습니다. 바뀌지 않은 패키지의 URL은 그대로 둡니다.
 - **태그를 꼭 붙이세요:** `#` 없이 설치하면 `main`의 최신 커밋을 받고, 그 커밋이 `packages-lock.json`에 고정됩니다. 그러면 어느 버전인지 알기 어렵고 업데이트도 직접 해야 합니다.
 - **바뀐 내용:** 패키지마다 `CHANGELOG.md`에 버전별로 적습니다.
@@ -794,11 +794,50 @@ ads.RevenuePaid += revenue => Analytics.LogAdRevenue(revenue.Value, revenue.Curr
 - **배너 높이:** `BannerHeight`(화면 픽셀)만큼 UI를 올리면 배너에 가려지지 않습니다. 불러오기 전에는 0입니다.
 - **다른 광고 네트워크:** `AdServiceBase`를 상속해 불러오기와 띄우기(`IsLoaded`, `PresentAsync`, 배너 3개)만 구현하면 규칙과 이벤트는 그대로 쓸 수 있습니다.
 
+## 로그인 (`Nyonyo.Framework.Auth`)
+
+게임 코드는 `IAuthService`만 씁니다. 실제 로그인은 선택 패키지로 설치합니다(Firebase: `com.nyonyo.framework.firebase`, 설치와 설정은 그 패키지의 README 참고).
+
+기본 흐름은 **게스트로 바로 시작하고, 나중에 구글(Android)이나 애플(iOS) 계정을 연결**하는 것입니다. 서비스가 시작될 때 로그인된 계정이 없으면 게스트로 로그인하고, 한 번 로그인한 계정은 다음 실행 때도 이어집니다.
+
+```csharp
+var auth = Services.Get<IAuthService>();
+
+await auth.WaitUntilInitializedAsync();                     // 시작(저장된 로그인 확인, 게스트 로그인)이 끝날 때까지
+var userId = auth.CurrentUser?.UserId;                      // 네트워크가 없으면 null일 수 있음
+auth.UserChanged += user => RefreshAccountUI(user);         // 로그인, 연결, 로그아웃(null)
+
+// 계정 연결 버튼. 지원하지 않는 플랫폼에서는 버튼을 숨김
+googleButton.SetActive(auth.IsProviderSupported(AuthProvider.Google));
+appleButton.SetActive(auth.IsProviderSupported(AuthProvider.Apple));
+auth.Link(AuthProvider.Google, result => { if (result == AuthResult.AlreadyInUse) AskSwitchAccount(); });
+
+// "이미 다른 게임 계정에 연결된 구글 계정입니다. 그 계정으로 전환할까요?"에서 전환을 고르면
+auth.SignIn(AuthProvider.Google, result => Debug.Log(result));
+
+// 설정 화면
+logoutButton.SetActive(auth.CurrentUser != null && !auth.CurrentUser.IsGuest);   // 게스트는 로그아웃하면 계정을 잃음
+auth.DeleteAccount(result => Debug.Log(result));                  // 스토어 정책상 계정 삭제 기능이 필요
+var token = await auth.GetIdTokenAsync();                          // 게임 서버에 보낼 토큰
+```
+
+| 구현 | 쓰는 곳 |
+|---|---|
+| `FirebaseAuthService` | Android, iOS (Firebase 패키지). 게스트, 구글(Android), 애플(iOS) |
+| `FakeAuthService` | 에디터. 서버 없이 모든 방식을 흉내 냅니다. 구글, 애플은 창에서 성공, 취소, 이미 다른 계정에 연결됨, 네트워크 오류를 골라 확인합니다. |
+| `NullAuthService` | WebGL, PC. 기기 안에만 저장하는 게스트 계정입니다. 구글, 애플은 `NotSupported`이고 토큰은 null입니다. |
+
+- **결과(`AuthResult`):** `Success`, `Cancelled`(창을 닫음), `NotSupported`, `NotSignedIn`, `AlreadyInUse`(연결하려는 계정이 이미 다른 게임 계정에 있음), `RequiresRecentSignIn`(계정 삭제 전에 다시 로그인 필요), `NetworkError`, `Busy`(다른 작업 진행 중), `Failed`(원인은 로그).
+- **한 번에 하나:** 로그인, 연결, 삭제는 동시에 하나만 진행합니다. 진행 중인지는 `IsBusy`로 확인합니다.
+- **게스트 계정은 잃을 수 있습니다:** 앱을 지우거나 기기를 바꾸면 되찾을 수 없습니다. 진행이 쌓이면 계정 연결을 권하고, 게스트에게는 로그아웃 버튼을 보이지 마세요.
+- **계정 전환:** 구글이나 애플로 `SignIn`하면 그 계정으로 바뀌고, 그 전의 게스트 계정 진행은 이어지지 않습니다. 진행을 지키려면 `Link`를 쓰세요.
+- **다른 로그인:** `AuthServiceBase`를 상속해 `SignInCoreAsync`, `LinkCoreAsync`, `SignOutCore`, `DeleteAccountCoreAsync`, `GetIdTokenCoreAsync`만 구현하면 공통 규칙과 이벤트는 그대로 쓸 수 있습니다.
+
 ## 에디터 도구
 
 | 메뉴 | 기능 |
 |---|---|
-| Tools > Nyonyo Framework > Settings > ... | 모든 설정 에셋(Framework, UI, Sound, UI Prefix, Game Data, AdMob)을 여는 곳입니다. 프로젝트에 있으면 선택하고, 없으면 기본 위치에 만듭니다. 설정 에셋은 Create 메뉴로 만들지 않습니다. |
+| Tools > Nyonyo Framework > Settings > ... | 모든 설정 에셋(Framework, UI, Sound, UI Prefix, Game Data, AdMob, Firebase)을 여는 곳입니다. 프로젝트에 있으면 선택하고, 없으면 기본 위치에 만듭니다. 설정 에셋은 Create 메뉴로 만들지 않습니다. |
 | Tools > Nyonyo Framework > Scene Switcher | 씬 목록 창. 클릭으로 열기, Play 버튼으로 바로 실행 |
 | Tools > Nyonyo Framework > Sound > Register Sounds to Addressables | 사운드 폴더를 Addressables에 등록 |
 | Tools > Create UI Script > Popup / UI | UI 스크립트 자동 생성 (아래 자동 매퍼) |

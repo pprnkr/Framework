@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  External Dependency Manager가 읽는 Android 의존성입니다.
+  GoogleSignInBridge.java(구글 로그인, Credential Manager)가 씁니다.
+-->
+<dependencies>
+  <androidPackages>
+    <androidPackage spec="androidx.credentials:credentials:1.5.0" />
+    <androidPackage spec="androidx.credentials:credentials-play-services-auth:1.5.0" />
+    <androidPackage spec="com.google.android.libraries.identity.googleid:googleid:1.1.1" />
+    <androidPackage spec="androidx.annotation:annotation:1.9.1" />
+  </androidPackages>
+</dependencies>

@@ -184,6 +184,7 @@
     <a href="#input">입력 · 카메라 · 데이터 · 2D</a>
     <a href="#debug">로그 · 콘솔 · 에디터 도구</a>
     <a href="#ads">광고 (AdMob 모듈) <span class="badge check">확인 필요</span></a>
+    <a href="#auth">로그인 (Firebase 모듈) <span class="badge check">확인 필요</span></a>
     <a href="#webgl">플랫폼 지원</a>
     <h4>참고</h4>
     <a href="#rules">꼭 지킬 규칙</a>
@@ -220,6 +221,7 @@
       <tr><td>로그</td><td><code>Nyonyo.Framework.Logging</code></td><td><span class="badge check">완료 · Unity 확인 필요</span></td></tr>
       <tr><td>디버그 콘솔</td><td><code>Nyonyo.Framework.Debugging</code></td><td><span class="badge check">완료 · Unity 확인 필요</span></td></tr>
       <tr><td>광고 (배너, 전면, 보상형, 앱 오프닝, 동의)</td><td><code>Nyonyo.Framework.Ads</code> + 선택 패키지 <code>com.nyonyo.framework.admob</code></td><td><span class="badge check">완료 · Unity·기기 확인 필요</span></td></tr>
+      <tr><td>로그인 (게스트, 구글/애플 계정 연결, 계정 삭제)</td><td><code>Nyonyo.Framework.Auth</code> + 선택 패키지 <code>com.nyonyo.framework.firebase</code></td><td><span class="badge check">완료 · Unity·기기 확인 필요</span></td></tr>
       <tr><td>Localization, Cinemachine 연동</td><td>—</td><td><span class="badge plan">보류 (패키지 도입 결정 필요)</span></td></tr>
     </table>
     </div>
@@ -230,8 +232,8 @@
     <h2>설치와 기본 설정</h2>
     <h3>다른 프로젝트에 설치</h3>
     <p>Package Manager에서 <b>+ › Install package from git URL</b>을 선택하고 아래 주소를 입력합니다.</p>
-<pre><code>https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.0</code></pre>
-    <p><code>#core/v0.2.0</code>은 git 태그입니다. 코어와 모듈은 버전을 따로 관리하고 <b>바뀐 패키지만</b> 버전을 올립니다(코어 <code>core/v…</code>, AdMob <code>admob/v…</code>). 업데이트할 때는 게임 manifest에서 그 패키지 URL의 태그만 바꿉니다.</p>
+<pre><code>https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.1</code></pre>
+    <p><code>#core/v0.2.1</code>은 git 태그입니다. 코어와 모듈은 버전을 따로 관리하고 <b>바뀐 패키지만</b> 버전을 올립니다(코어 <code>core/v…</code>, AdMob <code>admob/v…</code>, Firebase <code>firebase/v…</code>). 업데이트할 때는 게임 manifest에서 그 패키지 URL의 태그만 바꿉니다.</p>
 
     <h3>1. 설정 파일 만들기</h3>
     <p>메뉴 <b>Tools › Nyonyo Framework › Settings › Framework Settings</b>를 실행합니다. 그러면 <code>Assets/Resources/NyonyoFrameworkSettings.asset</code>이 생깁니다.</p>
@@ -957,7 +959,7 @@ static string AddGold(int amount = 1000) { Wallet.Gold += amount; return $"골�
   { "name": "OpenUPM", "url": "https://package.openupm.com", "scopes": ["com.google.ads.mobile"] }
 ],
 "dependencies": {
-  "com.nyonyo.framework": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.0",
+  "com.nyonyo.framework": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.1",
   "com.nyonyo.framework.admob": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework.admob#admob/v0.1.0"
 }</code></pre>
     <p>AdMob 플러그인 11.6.0과 External Dependency Manager는 자동으로 들어옵니다. UPM은 패키지 의존성에 git URL을 쓸 수 없어서 코어도 직접 적어야 합니다. Android 최소 API는 24입니다.</p>
@@ -984,6 +986,48 @@ ads.SkipNextAppOpen();                                    <span class="c">// 결
       <li><b>동의(GDPR):</b> 시작할 때 UMP로 동의를 확인하고 필요하면 창을 띄웁니다. 동의를 받지 못하면 광고를 시작하지 않습니다. AdMob 콘솔에서 GDPR 메시지를 만들어 두어야 합니다.</li>
       <li><b>에디터 확인:</b> 가짜 광고 창에서 "보상 받고 닫기", "건너뛰기"를 골라 보상 처리를 확인합니다. <code>SimulateNoFill</code>로 광고 없음도 확인합니다.</li>
       <li><b>출시 전:</b> 테스트 광고 끄기, 실제 앱 ID, 동의 지역 흉내 끄기, app-ads.txt 등록. 출시 빌드에 테스트 설정이 남아 있으면 빌드 때 경고합니다.</li>
+    </ul>
+  </section>
+
+  <section id="auth">
+    <h2>로그인 (Firebase 모듈) <span class="badge check">확인 필요</span></h2>
+    <p>게임 코드는 코어의 <code>IAuthService</code>만 씁니다. Firebase는 로그인이 필요한 게임만 선택 패키지 <code>com.nyonyo.framework.firebase</code>로 설치합니다. 기본 흐름은 <b>게스트로 바로 시작하고, 나중에 구글(Android)이나 애플(iOS) 계정을 연결</b>하는 것입니다.</p>
+    <h3>설치 (게임 manifest.json)</h3>
+    <p>Firebase Unity SDK는 Unity 레지스트리에 없어서 패키지 의존성으로 받을 수 없습니다. <a href="https://developers.google.com/unity/archive">Google APIs for Unity 보관 페이지</a>에서 tgz 세 개를 받아 <code>Packages</code> 옆 <code>GooglePackages</code> 폴더에 넣고 함께 적습니다.</p>
+<pre><code>"com.google.external-dependency-manager": "file:../GooglePackages/com.google.external-dependency-manager-1.2.190.tgz",
+"com.google.firebase.app": "file:../GooglePackages/com.google.firebase.app-14.1.0.tgz",
+"com.google.firebase.auth": "file:../GooglePackages/com.google.firebase.auth-14.1.0.tgz",
+"com.nyonyo.framework": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.1",
+"com.nyonyo.framework.firebase": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework.firebase#firebase/v0.1.0"</code></pre>
+    <ul>
+      <li><b>Firebase 콘솔:</b> Authentication에서 익명, Google, Apple을 켭니다. Android 앱에는 SHA-1 지문(디버그, 출시, Play 앱 서명 키)을 등록하고, 받은 <code>google-services.json</code>과 <code>GoogleService-Info.plist</code>를 Assets에 넣습니다. DEV와 SERVICE는 프로젝트를 따로 만드는 것을 권합니다.</li>
+      <li><b>SDK가 없으면:</b> 모듈은 컴파일되지만 기기 안의 게스트 로그인으로만 동작하고, 설정 인스펙터와 빌드 검사가 알려 줍니다.</li>
+      <li><b>AdMob과 함께 쓸 때:</b> EDM이 두 개가 되는데, Unity 공식 EDM이 감지해서 고르는 창을 띄웁니다. Unity 공식 EDM을 고르세요.</li>
+    </ul>
+    <h3>설정과 등록</h3>
+<pre><code>services.Register&lt;IAuthService&gt;(_firebaseSettings.CreateAuthService(Bootstrapper.Root, save));
+<span class="c">// Android/iOS는 Firebase, 에디터는 가짜 로그인(또는 실제 Firebase 게스트), WebGL·PC는 기기 안의 게스트</span></code></pre>
+    <h3>사용</h3>
+<pre><code>var auth = Services.Get&lt;IAuthService&gt;();
+await auth.WaitUntilInitializedAsync();                   <span class="c">// 시작(저장된 로그인, 게스트 로그인)이 끝날 때까지</span>
+var userId = auth.CurrentUser?.UserId;                    <span class="c">// 네트워크가 없으면 null일 수 있음</span>
+googleButton.SetActive(auth.IsProviderSupported(AuthProvider.Google));
+auth.Link(AuthProvider.Google, result =&gt; { if (result == AuthResult.AlreadyInUse) AskSwitchAccount(); });
+auth.SignIn(AuthProvider.Google, result =&gt; Debug.Log(result)); <span class="c">// 그 계정으로 전환</span>
+auth.DeleteAccount(result =&gt; Debug.Log(result));          <span class="c">// 스토어 정책상 필요</span></code></pre>
+    <div class="table-wrap">
+    <table>
+      <tr><th>플랫폼</th><th>로그인</th></tr>
+      <tr><td>Android</td><td>Firebase: 게스트, 구글(Credential Manager)</td></tr>
+      <tr><td>iOS</td><td>Firebase: 게스트, 애플(iOS 13 이상, 빌드에 권한 자동 추가)</td></tr>
+      <tr><td>WebGL, PC</td><td>기기 안의 게스트(<code>NullAuthService</code>). Firebase Unity SDK가 WebGL을 지원하지 않고, PC는 개발용(베타)입니다.</td></tr>
+      <tr><td>에디터</td><td>가짜 로그인 창(성공, 취소, 이미 다른 계정에 연결됨, 네트워크 오류) 또는 실제 Firebase 게스트</td></tr>
+    </table>
+    </div>
+    <ul>
+      <li><b>게스트 계정은 잃을 수 있습니다:</b> 앱을 지우거나 기기를 바꾸면 되찾을 수 없습니다. 진행이 쌓이면 계정 연결을 권하고, 게스트에게는 로그아웃 버튼을 보이지 마세요.</li>
+      <li><b>한 번에 하나:</b> 로그인, 연결, 삭제는 동시에 하나만 진행합니다. 진행 중에 요청하면 <code>Busy</code>입니다.</li>
+      <li><b>확인 상태:</b> C# 코드는 Firebase 14.1.0 DLL로 에디터, Android, iOS, WebGL 조건 모두 컴파일 에러 0이고, 구글 로그인 Java 코드도 실제 라이브러리로 컴파일했습니다. 애플 로그인 네이티브 코드(Objective-C)와 실제 기기 로그인은 확인하지 못했습니다.</li>
     </ul>
   </section>
 

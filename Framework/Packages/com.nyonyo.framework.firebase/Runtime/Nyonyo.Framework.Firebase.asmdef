@@ -1,0 +1,22 @@
+{
+    "name": "Nyonyo.Framework.Firebase",
+    "rootNamespace": "Nyonyo.Framework.Firebase",
+    "references": [
+        "Nyonyo.Framework"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.google.firebase.auth",
+            "expression": "14.0.0",
+            "define": "NYONYO_FIREBASE_AUTH"
+        }
+    ],
+    "noEngineReferences": false
+}

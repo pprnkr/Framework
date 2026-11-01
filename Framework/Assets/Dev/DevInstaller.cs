@@ -1,6 +1,7 @@
 using Nyonyo.Framework;
 using Nyonyo.Framework.Assets;
 using Nyonyo.Framework.Audio;
+using Nyonyo.Framework.Auth;
 using Nyonyo.Framework.Debugging;
 using Nyonyo.Framework.Events;
 using Nyonyo.Framework.Inputs;
@@ -45,6 +46,9 @@ namespace Nyonyo.Dev
             services.Register(new PopupManager(_uiSettings, Bootstrapper.Root, events, assets));
             services.Register(new SoundManager(_soundSettings, Bootstrapper.Root, assets, save));
             services.Register(new DebugConsole(Bootstrapper.Root));
+
+            // 게임에서는 Firebase 모듈의 FirebaseSettings.CreateAuthService로 만듭니다. 개발 프로젝트에는 Firebase SDK가 없어서 가짜 로그인을 씁니다.
+            services.Register<IAuthService>(new FakeAuthService(Bootstrapper.Root, save));
 
             Bootstrapper.Root.gameObject.AddComponent<DevSceneSwitcher>();
         }

@@ -1,0 +1,26 @@
+{
+    "name": "Nyonyo.Framework.Firebase.Editor",
+    "rootNamespace": "Nyonyo.Framework.Firebase.Editor",
+    "references": [
+        "Nyonyo.Framework",
+        "Nyonyo.Framework.Editor",
+        "Nyonyo.Framework.Firebase"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.google.firebase.auth",
+            "expression": "14.0.0",
+            "define": "NYONYO_FIREBASE_AUTH"
+        }
+    ],
+    "noEngineReferences": false
+}
