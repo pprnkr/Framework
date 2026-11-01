@@ -9,7 +9,7 @@ Nyonyo Framework의 광고 서비스(`IAdService`)를 Google AdMob으로 구현�
 
 ## 설치
 
-게임 프로젝트의 `Packages/manifest.json`에 OpenUPM 레지스트리와 두 패키지를 넣습니다. git 태그는 두 패키지가 같게 맞춥니다.
+게임 프로젝트의 `Packages/manifest.json`에 OpenUPM 레지스트리와 두 패키지를 넣습니다. 버전은 패키지마다 따로라서 태그도 각자 다릅니다(코어 `core/v…`, 이 모듈 `admob/v…`).
 
 ```json
 {
@@ -17,11 +17,13 @@ Nyonyo Framework의 광고 서비스(`IAdService`)를 Google AdMob으로 구현�
     { "name": "OpenUPM", "url": "https://package.openupm.com", "scopes": ["com.google.ads.mobile"] }
   ],
   "dependencies": {
-    "com.nyonyo.framework": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#v0.2.0",
-    "com.nyonyo.framework.admob": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework.admob#v0.2.0"
+    "com.nyonyo.framework": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.0",
+    "com.nyonyo.framework.admob": "https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework.admob#admob/v0.1.0"
   }
 }
 ```
+
+- **코어 버전:** 이 모듈의 `package.json`에 적힌 코어 버전(`com.nyonyo.framework`) 이상을 쓰세요. 코어만 올려도 됩니다.
 
 - **자동 설치:** AdMob 플러그인(`com.google.ads.mobile` 11.6.0)과 External Dependency Manager는 자동으로 따라 들어옵니다.
 - **두 줄 모두 필요:** UPM은 패키지 의존성에 git URL을 쓸 수 없습니다. 그래서 코어 패키지도 직접 적어야 합니다.

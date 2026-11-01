@@ -75,7 +75,12 @@ namespace Nyonyo.Framework.Editor.Data
 
                 var summary = new StringBuilder();
                 foreach (var table in tables)
-                    summary.Append($" {table.Name}({table.Rows.Count}행)");
+                {
+                    if (table.IsConfig)
+                        summary.Append($" {table.Name}(값 {table.Fields.Count}개)");
+                    else
+                        summary.Append($" {table.Name}({table.Rows.Count}행)");
+                }
                 Debug.Log($"[Nyonyo Framework] 게임 데이터 {tables.Count}개 테이블을 가져왔습니다:{summary}{(changed ? "" : " (바뀐 내용 없음)")}", _settings);
                 return true;
             }
@@ -351,7 +356,11 @@ namespace Nyonyo.Framework.Editor.Data
             var written = new HashSet<string>();
             var changed = false;
             foreach (var table in tables)
-                changed |= WriteFile(folder, table.RowClassName + ".g.cs", generator.GenerateTable(table), written);
+            {
+                // Config 시트에는 행 클래스가 없어서 테이블 클래스 이름으로 파일을 만듭니다.
+                var file = (table.IsConfig ? table.TableClassName : table.RowClassName) + ".g.cs";
+                changed |= WriteFile(folder, file, generator.GenerateTable(table), written);
+            }
             changed |= WriteFile(folder, _settings.ClassName.Trim() + ".g.cs", generator.GenerateRoot(tables), written);
 
             // 없어진 시트의 생성 파일을 지웁니다. 표시가 있는 파일만 지우므로 직접 만든 파일은 건드리지 않습니다.

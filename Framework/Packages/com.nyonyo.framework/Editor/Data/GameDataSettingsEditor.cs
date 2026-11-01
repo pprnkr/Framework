@@ -38,7 +38,13 @@ namespace Nyonyo.Framework.Editor.Data
             "• 첫 번째 열은 유니크 키(int, long, string). 겹치면 에러\n" +
             "• 자료형: int, long, float, double, bool, string, enum 이름, 배열(int[])\n" +
             "• 배열은 같은 변수명의 열들이 왼쪽부터 원소. 빈 칸은 건너뜀\n" +
-            "• 변수명이 _로 시작하는 열, 키가 _로 시작하는 행, 이름이 _로 시작하는 시트는 건너뜀";
+            "• 변수명이 _로 시작하는 열, 키가 _로 시작하는 행, 이름이 _로 시작하는 시트는 건너뜀\n\n" +
+            "Config 시트 (1행이 Type | Key | Value면 자동 인식)\n" +
+            "1행    | Type   | Key     | Value  | 설명(선택)\n" +
+            "2행~   | int    | IntTest | 99     | 테스트 값\n" +
+            "       | string | StrTest | merong |\n" +
+            "• 사용: GameData.Instance.Config.IntTest\n" +
+            "• 배열은 같은 Key의 행을 여러 개(자료형 int[]). 위에서부터 원소";
 
         private readonly GUIContent _keyLabel = new("서비스 계정 키",
             "구글 시트를 읽을 서비스 계정의 JSON 키 파일입니다.\n" +

@@ -36,6 +36,9 @@ namespace Nyonyo.Framework.Editor.Data
 
         public string GenerateTable(SheetTable table)
         {
+            if (table.IsConfig)
+                return GenerateConfigTable(table);
+
             var code = new CodeWriter();
             WriteHeader(code);
             code.Open($"namespace {_namespace}");
@@ -80,6 +83,39 @@ namespace Nyonyo.Framework.Editor.Data
             return code.ToString();
         }
 
+        // Config 시트는 행 클래스 없이, 테이블 클래스에 Key마다 속성을 둡니다.
+        private string GenerateConfigTable(SheetTable table)
+        {
+            var code = new CodeWriter();
+            WriteHeader(code);
+            code.Open($"namespace {_namespace}");
+
+            WriteSummary(code, $"{table.Name} 시트입니다(Config 형식). 추가 속성이나 함수는 다른 파일에 partial 클래스로 만드세요.");
+            code.Open($"public sealed partial class {table.TableClassName} : {Framework}.Data.ConfigTableBase");
+            code.Line($"public override string Name => \"{table.Name}\";");
+            code.Line();
+            code.Line($"public override int Count => {table.Fields.Count};");
+            code.Line();
+            code.Line($"protected override long SchemaHash => {table.SchemaHash}L;");
+            code.Line();
+            foreach (var field in table.Fields)
+            {
+                if (!string.IsNullOrWhiteSpace(field.Comment))
+                    WriteSummary(code, field.Comment);
+                code.Line($"public {field.Type.TypeName} {field.Name} {{ get; private set; }}");
+                code.Line();
+            }
+
+            code.Open($"protected override void ReadValues({Framework}.Data.GameDataReader reader)");
+            foreach (var field in table.Fields)
+                WriteRead(code, field);
+            code.Close();
+            code.Close();
+
+            code.Close();
+            return code.ToString();
+        }
+
         public string GenerateRoot(IReadOnlyList<SheetTable> tables)
         {
             var code = new CodeWriter();
@@ -110,7 +146,10 @@ namespace Nyonyo.Framework.Editor.Data
 
             foreach (var table in tables)
             {
-                WriteSummary(code, $"{table.Name} 시트입니다. 키는 {table.Key.Name}({table.Key.Type.TypeName})입니다.");
+                if (table.IsConfig)
+                    WriteSummary(code, $"{table.Name} 시트입니다(Config 형식). 값은 속성으로 바로 읽습니다.");
+                else
+                    WriteSummary(code, $"{table.Name} 시트입니다. 키는 {table.Key.Name}({table.Key.Type.TypeName})입니다.");
                 code.Line($"public {table.TableClassName} {table.Name} {{ get; }} = new {table.TableClassName}();");
                 code.Line();
             }

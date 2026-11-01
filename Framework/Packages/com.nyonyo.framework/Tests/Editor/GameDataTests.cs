@@ -136,6 +136,36 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
+        public void ConfigSheetToRuntime_LoadsValuesAsProperties()
+        {
+            var sheet = new TestSheets().ParseConfig();
+            var data = new TestGameData(new FakeAssetLoader(), _key, 0);
+            var config = new TestConfigTable(sheet.SchemaHash);
+
+            data.LoadTable(config, Encrypt(sheet));
+
+            Assert.IsTrue(config.IsLoaded);
+            Assert.AreEqual(99, config.IntTest);
+            Assert.AreEqual("merong", config.StrTest);
+            CollectionAssert.AreEqual(new[] { 1, 2 }, config.Rewards);
+            Assert.AreEqual(TestItemGrade.Epic, config.Grade);
+            Assert.AreEqual(0f, config.Rate);
+        }
+
+        [Test]
+        public void NormalSheetFile_IsRejectedByConfigTable()
+        {
+            var item = new TestSheets().ParseItem();
+            var data = new TestGameData(new FakeAssetLoader(), _key, 0);
+            var config = new TestConfigTable(item.SchemaHash);
+
+            var error = Assert.Throws<InvalidDataException>(() => data.LoadTable(config, Encrypt(item)));
+
+            StringAssert.Contains("Config 데이터 파일", error.Message);
+            Assert.IsFalse(config.IsLoaded);
+        }
+
+        [Test]
         public void SchemaMismatch_IsRejected()
         {
             var sheet = new TestSheets().ParseItem();

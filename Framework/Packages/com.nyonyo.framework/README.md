@@ -9,10 +9,17 @@ Unity 2D 게임 개발을 위한 공용 프레임워크 패키지입니다.
 다른 프로젝트에서 이 패키지를 쓰려면 Package Manager에서 **Install package from git URL**을 선택하고 아래 주소를 입력합니다.
 
 ```
-https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#v0.1.0
+https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.0
 ```
 
-`#v0.1.0` 부분은 사용할 버전의 git 태그입니다. 생략하면 `main` 브랜치의 최신 상태를 가져옵니다.
+`#core/v0.2.0` 부분은 사용할 버전의 git 태그입니다.
+
+### 버전과 업데이트
+
+- **패키지별 버전:** 코어와 선택 모듈(예: AdMob)은 버전을 따로 관리하고, **바뀐 패키지만** 버전을 올립니다. 태그도 패키지별입니다(코어 `core/v0.2.0`, AdMob `admob/v0.1.0`).
+- **업데이트 받기:** 게임의 `Packages/manifest.json`에서 그 패키지 URL의 `#` 뒤 태그를 새 버전으로 바꾸면 Unity가 다시 받습니다. 바뀌지 않은 패키지의 URL은 그대로 둡니다.
+- **태그를 꼭 붙이세요:** `#` 없이 설치하면 `main`의 최신 커밋을 받고, 그 커밋이 `packages-lock.json`에 고정됩니다. 그러면 어느 버전인지 알기 어렵고 업데이트도 직접 해야 합니다.
+- **바뀐 내용:** 패키지마다 `CHANGELOG.md`에 버전별로 적습니다.
 
 ## 폴더 구조
 
@@ -346,6 +353,39 @@ PopupManager.Instance.CloseAll(UILayer.Popup);  // 층을 생략하면 전부 �
 - **안전 영역(노치):** 버튼과 글자를 담는 오브젝트에 `SafeAreaFitter`를 붙이면 노치, 펀치홀, 홈 인디케이터를 피합니다. 배경과 Dim은 그 밖에 두어 화면 끝까지 채웁니다. PC와 WebGL에서는 화면 전체에 맞춰지므로 같은 프리팹을 그대로 씁니다.
 - **팝업이 아닌 UI:** HUD처럼 팝업이 아닌 UI를 같은 층 규칙으로 그리려면 `GetLayerRoot(UILayer.Screen)`의 자식으로 붙이세요.
 
+### 레드닷
+
+새 소식 표시(레드닷)를 켜고 끕니다. 모양은 게임마다 다르므로, 프레임워크는 지정한 오브젝트를 켜고 끄기만 합니다. 레드닷 종류는 게임에서 enum으로 정합니다.
+
+**1. 게임에서 한 번만 만들기**
+
+```csharp
+public enum ReddotType { Mail, Quest, Shop }
+
+// Unity는 제네릭 컴포넌트를 붙일 수 없어서, enum마다 한 줄짜리 클래스가 필요합니다.
+public class ReddotObject : Nyonyo.Framework.UI.ReddotObject<ReddotType> { }
+```
+
+**2. 프리팹에 붙이기**
+
+버튼처럼 늘 켜져 있는 오브젝트에 `ReddotObject`를 붙이고, 인스펙터에서 **Type**을 고른 뒤 **Target**에 레드닷 이미지를 넣습니다. 컴포넌트를 붙이면 Target은 자기 자신으로 채워집니다.
+
+**3. 코드에서 켜고 끄기**
+
+```csharp
+Reddot.Activate(ReddotType.Mail, true);    // 켜기
+Reddot.Activate(ReddotType.Mail, false);   // 끄기
+bool hasMail = Reddot.IsActive(ReddotType.Mail);
+Reddot.DeactivateAll<ReddotType>();        // 로그아웃 등에서 모두 끄기
+```
+
+- **등록:** `ReddotObject`는 Awake에서 자신을 등록하고, 지금 상태대로 Target을 켜거나 끕니다. OnDestroy에서 등록을 해제합니다.
+- **상태 기억:** 상태는 오브젝트와 따로 기억합니다. 팝업을 열기 전에 켜 두어도, 나중에 열린 팝업의 레드닷이 켜진 채로 나옵니다. 같은 종류의 레드닷이 여러 개면 모두 함께 켜지고 꺼집니다.
+- **처음에 켜 둘 것:** Awake는 켜진 오브젝트에서만 불립니다. `ReddotObject`가 붙은 오브젝트는 프리팹에서 켜 두세요. Target을 자기 자신으로 둘 때도 켜 두면 Awake에서 상태에 맞춰 꺼집니다.
+- **저장하지 않음:** 상태는 앱을 끄면 사라집니다. 게임 시작 때 서버나 저장 데이터를 보고 `Activate`로 다시 켜세요.
+- **여러 enum:** enum마다 상태를 따로 관리하므로 기능별로 enum을 나눠도 됩니다(enum마다 한 줄짜리 클래스를 만듭니다).
+- **static인 이유:** 씬 오브젝트가 서비스 등록 순서와 상관없이 Awake에서 등록할 수 있게 static으로 두었습니다. Domain Reload를 꺼도 Play를 시작할 때 초기화됩니다.
+
 ## 에셋 로딩 (`Nyonyo.Framework.Assets`)
 
 Resources와 Addressables를 같은 인터페이스(`IAssetLoader`)로 불러옵니다. 게임 시작에 꼭 필요한 최소한의 에셋만 Resources에 두고, 나머지는 Addressables를 쓰는 것을 기본으로 합니다.
@@ -601,6 +641,30 @@ input.ResetBindings();
   - 키가 빈 빈 행
 - **이름 규칙:** 시트 이름은 클래스 이름이 되므로 영문, 숫자, `_`만 씁니다. 시트 `Item`이면 행 클래스는 `ItemData`, 테이블은 `ItemTable`입니다.
 - **공유 설정:** 스프레드시트의 일반 액세스는 **"제한됨"** 그대로 둡니다. 아래에서 만드는 **서비스 계정 이메일만 뷰어로 추가**합니다.
+
+#### Config 시트
+
+설정값처럼 행마다 값이 하나씩인 데이터는 Config 형식으로 적습니다. **1행이 `Type | Key | Value`이면** 자동으로 Config 시트로 읽습니다(대소문자 무시).
+
+| Type | Key | Value | 설명(선택) |
+|---|---|---|---|
+| int | IntTest | 99 | 테스트 값 |
+| string | StrTest | merong | |
+| int[] | Rewards | 100 | 보상 목록 |
+| int[] | Rewards | 200 | |
+
+```csharp
+int value = GameData.Instance.Config.IntTest;      // 99
+string text = GameData.Instance.Config.StrTest;    // "merong"
+int[] rewards = GameData.Instance.Config.Rewards;  // { 100, 200 }
+```
+
+- **Key:** Key가 속성 이름이 됩니다. 일반 시트의 변수명과 같은 규칙(영문자로 시작, 영문, 숫자, `_`)이고, 겹치면 에러입니다.
+- **자료형과 빈 값:** 일반 시트와 같습니다(enum, 빈 값은 기본값).
+- **배열:** 같은 Key의 행을 여러 개 적습니다(모두 같은 배열 자료형). 위에서부터 원소가 되고, 값이 빈 행은 건너뜁니다.
+- **설명:** D열은 생성 코드의 문서 주석이 됩니다. E열부터는 가져오지 않습니다.
+- **건너뛰기:** Key가 `_`로 시작하는 행과 빈 행은 가져오지 않습니다.
+- **생성 클래스:** 시트 `Config`이면 `ConfigTable`(코드 파일 `ConfigTable.g.cs`)이 만들어집니다. 행 클래스는 없습니다. 기반 클래스는 `ConfigTableBase`입니다.
 
 ### 2. 서비스 계정 준비 (한 번만)
 

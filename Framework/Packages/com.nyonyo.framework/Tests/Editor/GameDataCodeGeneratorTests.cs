@@ -41,6 +41,25 @@ namespace Nyonyo.Framework.Editor.Tests
         }
 
         [Test]
+        public void ConfigTable_GeneratesPropertiesPerKey()
+        {
+            var config = new TestSheets().ParseConfig();
+
+            var code = _generator.GenerateTable(config);
+            var root = _generator.GenerateRoot(new[] { _item, config });
+
+            StringAssert.Contains("public sealed partial class ConfigTable : global::Nyonyo.Framework.Data.ConfigTableBase", code);
+            StringAssert.DoesNotContain("ConfigData", code, "Config 시트에는 행 클래스가 없습니다.");
+            StringAssert.Contains("public override int Count => 5;", code);
+            StringAssert.Contains("/// <summary>정수 값</summary>", code);
+            StringAssert.Contains("public int IntTest { get; private set; }", code);
+            StringAssert.Contains("public int[] Rewards { get; private set; }", code);
+            Assert.Less(code.IndexOf("IntTest = reader.ReadInt();"), code.IndexOf("StrTest = reader.ReadString();"));
+            Assert.Less(code.IndexOf("StrTest = reader.ReadString();"), code.IndexOf("Rewards = reader.ReadIntArray();"));
+            StringAssert.Contains("public ConfigTable Config { get; } = new ConfigTable();", root);
+        }
+
+        [Test]
         public void Root_ListsTablesAndLoadSettings()
         {
             var code = _generator.GenerateRoot(new[] { _item });

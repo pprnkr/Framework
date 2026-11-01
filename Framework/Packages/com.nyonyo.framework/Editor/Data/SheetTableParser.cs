@@ -16,6 +16,7 @@ namespace Nyonyo.Framework.Editor.Data
     /// <item>배열은 자료형을 <c>int[]</c>(또는 <c>Array&lt;int&gt;</c>, <c>List&lt;int&gt;</c>)로 적고, 같은 변수명의 열들이 왼쪽부터 원소가 됩니다. 빈 칸은 건너뜁니다.</item>
     /// <item>단일 값의 빈 칸은 기본값(0, false, 빈 문자열, enum 0)입니다.</item>
     /// </list>
+    /// 1행이 <c>Type | Key | Value</c>이면 Config 시트입니다(<see cref="ParseConfig"/>).
     /// 에러는 모두 모아서 "시트!셀" 위치와 함께 돌려줍니다.
     /// </remarks>
     internal sealed class SheetTableParser
@@ -24,6 +25,18 @@ namespace Nyonyo.Framework.Editor.Data
         public const int TypeRow = 1;
         public const int NameRow = 2;
         public const int FirstDataRow = 3;
+
+        public const int ConfigTypeColumn = 0;
+        public const int ConfigKeyColumn = 1;
+        public const int ConfigValueColumn = 2;
+        public const int ConfigCommentColumn = 3;
+
+        // Config 시트의 Key는 생성 테이블 클래스의 속성이 되므로, 기반 클래스와 object의 멤버 이름은 쓸 수 없습니다.
+        private static readonly HashSet<string> s_reservedConfigKeys = new()
+        {
+            "Name", "Count", "IsLoaded", "SchemaHash", "OnLoaded", "ReadValues", "Load", "LoadRows",
+            "Equals", "GetHashCode", "ToString", "GetType",
+        };
 
         private static readonly Regex s_identifier = new("^[A-Za-z][A-Za-z0-9_]*$");
         private static readonly Regex s_arrayType = new(@"^(?:(?<element>.+)\[\]|(?:Array|List)<(?<element>.+)>)$", RegexOptions.IgnoreCase);
@@ -62,6 +75,9 @@ namespace Nyonyo.Framework.Editor.Data
                 errors.Add($"{sheetName}: 시트 이름은 클래스 이름이 되므로 영문자로 시작하는 영문, 숫자, _만 쓸 수 있습니다. 가져오지 않을 시트는 이름을 _로 시작하세요.");
                 return null;
             }
+
+            if (IsConfigSheet(grid))
+                return ParseConfig(sheetName, grid, errors);
 
             if (grid.Count < FirstDataRow)
             {
@@ -394,6 +410,139 @@ namespace Nyonyo.Framework.Editor.Data
                     return true;
             }
             return false;
+        }
+
+        #endregion
+
+        #region Config
+
+        /// <summary>1행의 A~C열이 Type, Key, Value(대소문자 무시)이면 Config 시트입니다.</summary>
+        public bool IsConfigSheet(IReadOnlyList<string[]> grid)
+        {
+            return grid.Count > 0
+                && IsHeader(grid, ConfigTypeColumn, "Type")
+                && IsHeader(grid, ConfigKeyColumn, "Key")
+                && IsHeader(grid, ConfigValueColumn, "Value");
+        }
+
+        /// <summary>
+        /// Config 시트를 해석합니다. 2행부터 한 행이 값 하나이고, Key가 생성 클래스의 속성 이름이 됩니다.
+        /// </summary>
+        /// <remarks>
+        /// <list type="bullet">
+        /// <item>A열 자료형, B열 Key, C열 값, D열(있으면) 설명입니다. 설명은 생성 코드의 문서 주석이 되고, E열부터는 가져오지 않습니다.</item>
+        /// <item>Key가 _로 시작하는 행과 빈 행은 건너뜁니다. Key가 겹치면 에러입니다.</item>
+        /// <item>배열은 같은 Key의 행을 여러 개 적습니다(자료형은 모두 같은 배열). 위에서부터 원소가 되고, 값이 빈 행은 건너뜁니다.</item>
+        /// </list>
+        /// </remarks>
+        private SheetTable ParseConfig(string sheet, IReadOnlyList<string[]> grid, List<string> errors)
+        {
+            var errorCount = errors.Count;
+            var fields = new List<SheetField>();
+            var values = new List<object>();
+            var byKey = new Dictionary<string, int>();
+
+            for (var row = 1; row < grid.Count; row++)
+            {
+                var key = Cell(grid, row, ConfigKeyColumn).Trim();
+                var typeText = Cell(grid, row, ConfigTypeColumn).Trim();
+                var text = Cell(grid, row, ConfigValueColumn);
+                var comment = Cell(grid, row, ConfigCommentColumn).Trim();
+                var keyCell = CellName(sheet, row, ConfigKeyColumn);
+
+                if (key.StartsWith("_"))
+                    continue;
+
+                if (key.Length == 0)
+                {
+                    if (typeText.Length > 0 || text.Trim().Length > 0)
+                        errors.Add($"{keyCell}: 값이 있는 행인데 Key가 비어 있습니다. 쓰지 않을 행이면 Key를 _로 시작하세요.");
+                    continue;
+                }
+
+                if (!IsValidIdentifier(key) || s_reservedConfigKeys.Contains(key) || key == sheet + "Table")
+                {
+                    errors.Add($"{keyCell}: Key '{key}'는 쓸 수 없습니다. 영문자로 시작하는 영문, 숫자, _만 쓰고, C# 키워드와 {string.Join(", ", s_reservedConfigKeys)}, {sheet}Table은 피하세요.");
+                    continue;
+                }
+
+                if (typeText.Length == 0)
+                {
+                    errors.Add($"{CellName(sheet, row, ConfigTypeColumn)}: '{key}'의 자료형이 비어 있습니다.");
+                    continue;
+                }
+
+                var type = ParseType(typeText, out var typeError);
+                if (type == null)
+                {
+                    errors.Add($"{CellName(sheet, row, ConfigTypeColumn)}: {typeError}");
+                    continue;
+                }
+
+                if (byKey.TryGetValue(key, out var index))
+                {
+                    var existing = fields[index];
+                    if (!type.IsArray || !existing.Type.IsArray)
+                    {
+                        errors.Add($"{keyCell}: Key '{key}'가 {CellName(sheet, existing.Columns[0], ConfigKeyColumn)}과 겹칩니다. 여러 행을 배열로 묶으려면 같은 Key의 행 모두 자료형을 배열(예: int[])로 적으세요.");
+                        continue;
+                    }
+                    if (type.TypeName != existing.Type.TypeName)
+                    {
+                        errors.Add($"{CellName(sheet, row, ConfigTypeColumn)}: 배열 '{key}'의 자료형({type.TypeName})이 앞 행({existing.Type.TypeName})과 다릅니다.");
+                        continue;
+                    }
+
+                    existing.AddColumn(row, comment);
+                    AddConfigValue(sheet, row, type, text, (List<object>)values[index], errors);
+                    continue;
+                }
+
+                // Config 시트에서는 SheetField의 열 번호 자리에 행 번호를 넣습니다(에러 위치 표시용).
+                fields.Add(new SheetField(key, comment, type, row));
+                byKey.Add(key, fields.Count - 1);
+                if (type.IsArray)
+                {
+                    var list = new List<object>();
+                    values.Add(list);
+                    AddConfigValue(sheet, row, type, text, list, errors);
+                }
+                else if (TryParseValue(type, text, out var value, out var error))
+                {
+                    values.Add(value);
+                }
+                else
+                {
+                    values.Add(null);
+                    errors.Add($"{CellName(sheet, row, ConfigValueColumn)}: {error}");
+                }
+            }
+
+            if (errors.Count > errorCount)
+                return null;
+
+            if (fields.Count == 0)
+            {
+                errors.Add($"{sheet}: Config 시트에 값이 없습니다. 2행부터 Type, Key, Value를 적으세요.");
+                return null;
+            }
+
+            return new SheetTable(sheet, fields, new[] { values.ToArray() }, true);
+        }
+
+        private void AddConfigValue(string sheet, int row, SheetColumnType type, string text, List<object> list, List<string> errors)
+        {
+            if (text.Trim().Length == 0)
+                return;
+            if (TryParseValue(type, text, out var element, out var error))
+                list.Add(element);
+            else
+                errors.Add($"{CellName(sheet, row, ConfigValueColumn)}: {error}");
+        }
+
+        private bool IsHeader(IReadOnlyList<string[]> grid, int column, string expected)
+        {
+            return string.Equals(Cell(grid, 0, column).Trim(), expected, StringComparison.OrdinalIgnoreCase);
         }
 
         #endregion

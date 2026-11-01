@@ -24,7 +24,33 @@ namespace Nyonyo.Framework.Editor.Tests
             new[] { "1003", "방패", "5", "", "common", "", "" },
         };
 
+        /// <summary>
+        /// <see cref="TestConfigTable"/>과 같은 구성의 Config 시트입니다.
+        /// 배열 Rewards는 사이에 다른 행을 두고 두 행, 건너뛸 행(_Draft), 메모만 있는 행, 값이 빈 행(Rate)이 들어 있습니다.
+        /// </summary>
+        public List<string[]> ConfigGrid() => new()
+        {
+            new[] { "Type", "Key", "Value", "설명" },
+            new[] { "int", "IntTest", "99", "정수 값" },
+            new[] { "string", "StrTest", "merong" },
+            new[] { "int[]", "Rewards", "1", "보상 목록" },
+            new[] { "int", "_Draft", "abc", "" },
+            new[] { "", "", "", "메모만 있는 행" },
+            new[] { "int[]", "Rewards", "2", "" },
+            new[] { "TestItemGrade", "Grade", "epic", "" },
+            new[] { "float", "Rate", "", "" },
+        };
+
         public SheetTableParser CreateParser() => new(FindEnum);
+
+        public SheetTable ParseConfig()
+        {
+            var errors = new List<string>();
+            var table = CreateParser().Parse("Config", ConfigGrid(), errors);
+            if (errors.Count > 0)
+                throw new InvalidOperationException(string.Join("\n", errors));
+            return table;
+        }
 
         public SheetTable ParseItem()
         {

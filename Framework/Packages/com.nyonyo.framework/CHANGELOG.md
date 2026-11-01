@@ -1,6 +1,13 @@
 # Changelog
 
 이 패키지의 변경 사항을 기록합니다. 버전 규칙은 [Semantic Versioning](https://semver.org/lang/ko/)을 따릅니다.
+버전은 패키지마다 따로 관리하고, 이 패키지가 바뀌었을 때만 올립니다. git 태그는 `core/v버전`입니다(예: `core/v0.2.0`).
+
+## [0.2.0] - 2026-11-01
+
+### Added
+- 레드닷: `Reddot`(`Activate(type, active)`, `IsActive`, `DeactivateAll<TType>`), `ReddotObject<TType>`(Awake에서 등록, Target 오브젝트를 켜고 끔). 레드닷 종류는 게임의 enum으로 정합니다.
+- 게임 데이터: Config 시트. 1행이 `Type | Key | Value`인 시트는 행마다 값 하나를 적고, Key마다 속성이 있는 `{시트}Table : ConfigTableBase`를 만듭니다(`GameData.Instance.Config.IntTest`). 같은 Key의 여러 행은 배열, D열은 설명입니다.
 
 ## [0.1.0] - 2026-10-26
 

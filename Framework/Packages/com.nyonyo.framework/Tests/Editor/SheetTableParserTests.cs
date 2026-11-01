@@ -194,6 +194,86 @@ namespace Nyonyo.Framework.Editor.Tests
             Assert.AreEqual("Item!AB10", _parser.CellName("Item", 9, 27));
         }
 
+        #region Config
+
+        [Test]
+        public void Config_KeysBecomeFields_SameKeyRowsMergeIntoArray()
+        {
+            var table = _sheets.ParseConfig();
+
+            Assert.IsTrue(table.IsConfig);
+            CollectionAssert.AreEqual(new[] { "IntTest", "StrTest", "Rewards", "Grade", "Rate" }, table.Fields.Select(f => f.Name).ToArray());
+            Assert.AreEqual("정수 값", table.Fields[0].Comment, "D열은 설명입니다.");
+            Assert.AreEqual("int[]", table.Fields[2].Type.TypeName);
+
+            Assert.AreEqual(1, table.Rows.Count, "Config 시트는 행 하나로 담습니다.");
+            var values = table.Rows[0];
+            Assert.AreEqual(99, values[0]);
+            Assert.AreEqual("merong", values[1]);
+            CollectionAssert.AreEqual(new object[] { 1, 2 }, (List<object>)values[2], "같은 Key의 행이 위에서부터 원소가 됩니다.");
+            Assert.AreEqual((int)TestItemGrade.Epic, values[3]);
+            Assert.AreEqual(0f, values[4], "빈 값은 기본값입니다.");
+        }
+
+        [Test]
+        public void Config_HeaderIsCaseInsensitive_OtherwiseNormalSheet()
+        {
+            Assert.IsTrue(_parser.IsConfigSheet(new List<string[]> { new[] { "type", "KEY", " Value " } }));
+            Assert.IsFalse(_parser.IsConfigSheet(new List<string[]> { new[] { "Type", "Key" } }));
+            Assert.IsFalse(_parser.IsConfigSheet(_sheets.ItemGrid()));
+        }
+
+        [Test]
+        public void Config_DuplicateSingleKey_IsErrorWithBothCells()
+        {
+            var grid = new List<string[]>
+            {
+                new[] { "Type", "Key", "Value" },
+                new[] { "int", "Gold", "1" },
+                new[] { "int", "Gold", "2" },
+            };
+
+            Assert.IsNull(_parser.Parse("Config", grid, _errors));
+
+            Assert.AreEqual(1, _errors.Count);
+            StringAssert.Contains("Config!B3", _errors[0]);
+            StringAssert.Contains("Config!B2", _errors[0]);
+        }
+
+        [Test]
+        public void Config_InvalidValuesAndReservedKeys_AreAllReported()
+        {
+            var grid = new List<string[]>
+            {
+                new[] { "Type", "Key", "Value" },
+                new[] { "int", "Gold", "abc" },
+                new[] { "int", "Count", "1" },
+                new[] { "", "Missing", "1" },
+                new[] { "int", "", "5" },
+            };
+
+            Assert.IsNull(_parser.Parse("Config", grid, _errors));
+
+            Assert.AreEqual(4, _errors.Count, string.Join("\n", _errors));
+            StringAssert.Contains("Config!C2", _errors[0]);
+            StringAssert.Contains("Count", _errors[1]);
+            StringAssert.Contains("Config!A4", _errors[2]);
+            StringAssert.Contains("Config!B5", _errors[3]);
+        }
+
+        [Test]
+        public void Config_SchemaHash_DiffersFromNormalSheetWithSameFields()
+        {
+            var config = _sheets.ParseConfig();
+            var fields = new List<SheetField>(config.Fields);
+
+            var normal = new SheetTable("Config", fields, config.Rows);
+
+            Assert.AreNotEqual(config.SchemaHash, normal.SchemaHash);
+        }
+
+        #endregion
+
         // 1행 주석은 비워 두고, 2행 자료형, 3행 변수명, 4행부터 데이터인 시트를 만듭니다.
         private List<string[]> Grid(string[] types, string[] names, params string[][] rows)
         {

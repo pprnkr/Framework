@@ -1,6 +1,7 @@
 # Changelog
 
 이 패키지의 변경 사항을 기록합니다. 버전 규칙은 [Semantic Versioning](https://semver.org/lang/ko/)을 따릅니다.
+버전은 코어와 따로 관리하고, 이 패키지가 바뀌었을 때만 올립니다. git 태그는 `admob/v버전`입니다(예: `admob/v0.1.0`).
 
 ## [0.1.0] - 2026-10-27
 

@@ -3,7 +3,7 @@
 앞으로 만들 Unity 2D 게임들이 공용으로 쓸 프레임워크를 UPM 패키지로 개발하는 프로젝트입니다.
 새 세션에서 이어서 작업할 때 이 문서를 먼저 읽으세요.
 
-마지막 갱신: 2026-10-27
+마지막 갱신: 2026-11-01
 
 ## 환경
 
@@ -42,16 +42,25 @@
 | 표시 이름 / 작성자 | `Nyonyo Framework` / `Nyonyo` |
 | 어셈블리 / 네임스페이스 | `Nyonyo.Framework` (PascalCase) |
 | GitHub 계정 | `pprnkr` 유지. `nyonyo`는 다른 사람이 이미 쓰는 계정이라 바꿀 수 없음 |
-| 설치 URL | `https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#v0.1.0` |
+| 설치 URL | `https://github.com/pprnkr/Framework.git?path=/Framework/Packages/com.nyonyo.framework#core/v0.2.0` (AdMob은 `...com.nyonyo.framework.admob#admob/v0.1.0`) |
 | 의존성 관리 방식 | 서비스 로케이터. 싱글톤은 쓰지 않고, DI 프레임워크(VContainer, Zenject)는 무거워서 보류 |
 | 비동기 | Unity 내장 `Awaitable` 사용. UniTask 같은 외부 의존성은 쓰지 않음 |
 | 부트스트랩 방식 | `RuntimeInitializeOnLoadMethod`로 자동 시작. Boot 씬은 쓰지 않음 |
 | 서비스 스코프 | 지금은 전역 서비스만. 씬 스코프 서비스는 나중에 필요할 때 추가 |
 | 화면 방향 | 세로형이 기본(1080x1920). 게임마다 `UISettings.Orientation` enum으로 정함 (2026-10-27 사용자 요청) |
 | 서드파티 모듈 | 네이티브 SDK나 빌드 설정이 필요한 서드파티(AdMob, Firebase, 로그인 등)는 같은 저장소의 별도 패키지 `com.nyonyo.framework.<이름>`으로 분리. 인터페이스와 가짜/Null 구현은 코어에 둠. 가벼운 Unity 공식 패키지는 코어 안에서 `versionDefines`로 선택 컴파일 (2026-10-27 사용자 동의) |
-| 모듈 버전 | 코어와 모듈은 같은 git 태그로 함께 올림. UPM은 package.json 의존성에 git URL을 못 쓰므로 게임 manifest에 코어와 모듈을 모두 적음 |
+| 모듈 버전 | **패키지마다 따로** (2026-11-01 사용자 결정, 이전의 "같은 태그로 함께 올림"을 대체). 바뀐 것이 있을 때만 그 패키지 버전을 올려서 게임이 다시 임포트하게 함(사용자 원칙). 태그도 패키지별(`core/v0.2.0`, `admob/v0.1.0`). 모듈이 새 코어 기능을 쓰게 되면 모듈의 `com.nyonyo.framework` 의존성 최소 버전을 올림. 코어에 깨지는 변경이 생기면 그 API를 쓰는 모듈을 함께 고치고 올림. UPM은 package.json 의존성에 git URL을 못 쓰므로 게임 manifest에 코어와 모듈을 모두 적음 |
 
 README의 설치 URL에 남은 `pprnkr`는 실제 저장소 주소라서 일부러 그대로 둔 것입니다. 바꾸면 설치가 깨집니다.
+
+**출시 절차 (패키지별 버전)**
+1. 마지막 태그 이후 바뀐 패키지를 확인합니다: `git -C .. log --oneline core/v0.2.0..HEAD -- Framework/Packages/com.nyonyo.framework` (AdMob은 `admob/v…`와 그 폴더).
+2. 바뀐 패키지만 `package.json`의 `version`을 올리고 그 패키지 `CHANGELOG.md`에 `## [버전] - 날짜`를 적습니다. 0.x 동안 깨지는 변경은 가운데 숫자, 나머지는 끝 숫자를 올립니다.
+3. 모듈이 새 코어 기능을 쓰면 모듈 `package.json`의 `com.nyonyo.framework` 최소 버전도 올립니다.
+4. 새 파일의 `.meta`가 모두 있는지 확인합니다. git 패키지는 읽기 전용이라 `.meta` 없는 파일은 게임에서 무시됩니다.
+5. 커밋하고 바뀐 패키지만 태그를 만듭니다(`git tag core/v0.3.0`). 푸시는 사용자가 `git push origin main --tags`로 합니다.
+6. 게임 manifest에서 그 패키지 URL의 `#` 뒤 태그만 바꿉니다.
+- **첫 태그(2026-11-01):** 그때까지 태그가 하나도 없었습니다(README의 `#v0.1.0`도 실제로는 없었음). 레드닷과 Config 시트를 넣은 커밋에 `core/v0.2.0`, 같은 커밋에 `admob/v0.1.0`(AdMob 코드는 처음 추가 이후 변경 없음)을 붙였습니다.
 
 ## 패키지 구조
 
@@ -91,6 +100,8 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
 | 9 | 디버그 도구 (로거, 디버그 콘솔, 에디터 씬 전환 창) | 완료 (컴파일만 확인) |
 | 10 | 광고: 코어 `IAdService` + AdMob 모듈(배너, 전면, 보상형, 앱 오프닝, UMP 동의) | 완료 (실제 AdMob 11.6.0 DLL로 컴파일만 확인, Unity와 기기 검증 안 됨) |
 | 11 | 게임 데이터: 구글 시트 → partial 클래스 생성 + 암호화 `.bytes` (기존 Data 교체) | 완료 (.NET 하네스로 테스트 29개 실행, 생성 코드 컴파일과 로드 확인. 실제 구글 시트 내려받기와 Unity는 확인 안 됨) |
+| 12 | 레드닷 (`Reddot`, `ReddotObject<TType>`, 게임 enum) | 완료 (외부 컴파일만 확인, Unity 검증 안 됨) |
+| 13 | 게임 데이터 Config 시트 (머리글 Type, Key, Value, `ConfigTableBase`) | 완료 (.NET 하네스 테스트와 생성 코드 컴파일·로드 확인, Unity 검증 안 됨) |
 | **다음** | **배포 레벨(DEV/SERVICE)과 빌드 메뉴(Tools/Build)** | **검토만 완료, 구현 전.** 아래 "다음 할 일" 절 참고 |
 | - | Localization, Cinemachine 연동 | 보류: 패키지 도입 여부를 사용자가 정해야 함 |
 
@@ -223,6 +234,22 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
 - `PopupTest`: 같은 층에 쌓기, 띠알람 띄우기, OK.
 - `PopupNotice`: Notice 층, 2초 뒤 자동으로 닫힘, BackKey Ignore.
 - `DevSampleSetup`: 메뉴 Tools > Nyonyo Framework > Dev > Setup Samples. 프리팹, DevUISettings, DevInstaller, FrameworkSettings 연결, SampleScene2, Scene List를 자동으로 준비합니다.
+
+## 구현 완료: 레드닷 (2026-11-01, `Runtime/UI/Reddot.cs`, `ReddotObject.cs`)
+
+사용자 요구사항: 디자인은 게임마다 다르므로 프레임워크는 게임오브젝트를 켜고 끄기만 합니다. 레드닷 종류는 게임이 enum으로 정합니다. 인스펙터에서 종류를 지정한 오브젝트가 Awake에서 static 메서드로 자신을 등록하고, `Reddot.Activate(ReddotType.A, true)`로 켜고 끕니다.
+
+| 타입 | 역할 |
+|---|---|
+| `Reddot` (static) | `Activate<TType>(type, active)`, `IsActive`, `DeactivateAll<TType>()`. internal `Register`/`Unregister`/`Clear`. enum 타입별 그룹(`Dictionary<Type, object>` → `Group<TType>`: 켜진 종류 `HashSet`, 종류별 오브젝트 목록) |
+| `ReddotObject<TType>` (abstract MonoBehaviour) | `_type`, `_target`. `Reset()`에서 Target을 자기 자신으로 채움. Awake 등록(Target이 비면 경고), OnDestroy 해제. 게임은 `public class ReddotObject : ReddotObject<ReddotType> { }` 한 줄 클래스를 만듦(Unity는 제네릭 컴포넌트를 붙일 수 없음) |
+
+결정 사항:
+- **static:** 사용자 요구로 static입니다(기본 규칙 4의 예외, 코드에 이유 주석). `SubsystemRegistration`에서 초기화합니다.
+- **상태와 오브젝트 분리:** 켜진 상태를 따로 기억해서, 등록할 때 바로 적용합니다. 열기 전 팝업이나 나중에 켜지는 UIView의 레드닷도 맞게 나옵니다.
+- **Target 자기 자신 대체 안 함:** 처음에는 Target이 비면 자기 자신을 쓰려 했으나, 지정한 Target이 파괴되면 Unity null 때문에 버튼 자체가 꺼지는 문제가 있어 `Reset()`으로 채우는 방식으로 바꿨습니다.
+- **반복 중 변경:** Target을 켜는 순간 하위 레드닷이 Awake에서 등록될 수 있어서 목록 복사본을 돕니다. 파괴된 오브젝트는 적용 전에 목록에서 뺍니다.
+- **보류:** 부모-자식 합산(하위 중 하나라도 켜지면 상위 메뉴 켜짐), 개수 표시, 아이템 ID 같은 동적 키, 상태 저장.
 
 ## 구현 완료: UI 자동 매퍼 (`Editor/UI/`, 네임스페이스 `Nyonyo.Framework.Editor.UI`, 에디터 전용)
 
@@ -440,9 +467,18 @@ Packages/com.nyonyo.framework.admob/    선택 모듈 (의존성: 코어, com.go
   - **확인하지 못한 것:** 실제 구글 시트 내려받기, Unity 에디터 가져오기, Addressables 등록, 런타임 로드(`LoadAllAsync`)입니다.
 - **보류:** 테이블 간 참조 자료형, Vector 같은 복합 자료형, 셀 하나에 구분자로 배열 넣기, 데이터 파일 하나로 합치기.
 
+**Config 시트 (2026-11-01 사용자 요청)**
+- **사용자 요구:** 일반 시트는 지금 방식 그대로, Config 시트는 `Type | Key | Value` 머리글 아래로 값을 한 행씩 추가합니다.
+- **인식 방법(제가 정함, 사용자 확인 전):** 1행 A~C열이 Type, Key, Value(대소문자 무시)이면 Config 시트입니다. 설정 SO는 바꾸지 않았습니다.
+- **생성 코드:** 시트 `Config` → `ConfigTable : ConfigTableBase`(행 클래스 없음, Key마다 `{ get; private set; }` 속성, `Count`는 값 개수, `ReadValues`), 파일 `ConfigTable.g.cs`. 사용은 `GameData.Instance.Config.IntTest`입니다.
+  - **기반 이름:** 프레임워크 기반을 `ConfigTable`로 하면 시트 `Config`가 만드는 `ConfigTable`과 이름이 겹쳐, 두 네임스페이스를 함께 쓰는 게임 코드에서 모호해집니다. 그래서 `ConfigTableBase`로 정했습니다.
+- **규칙:** D열은 설명(문서 주석), E열부터 무시. 같은 Key의 배열 자료형 행은 위에서부터 원소(일반 시트의 같은 변수명 열과 같은 규칙). Key가 `_`로 시작하거나 빈 행은 건너뜁니다. 기반 클래스와 object 멤버 이름(Name, Count, IsLoaded, SchemaHash, OnLoaded, ReadValues, Load, LoadRows, Equals, GetHashCode, ToString, GetType)과 `{시트}Table`은 Key로 쓸 수 없습니다.
+- **바이너리:** 기존 형식 그대로입니다. 행 수 1, 그 한 행에 값을 Key 순서대로 씁니다. `ConfigTableBase`는 행 수가 1이 아니면 `InvalidDataException`을 냅니다. SchemaHash에 `|config`를 넣어 일반 시트와 구분합니다.
+- **검증:** .NET 하네스로 게임 데이터 테스트 42개를 실행해 모두 통과했습니다. 사용자 예시 시트(IntTest 99, StrTest merong)로 생성 코드를 만들고 csc로 컴파일한 뒤 로드해서 값을 확인했습니다(scratchpad `configcheck/`). Unity 에디터 가져오기는 확인하지 못했습니다.
+
 ### 테스트 (`Tests/Editor/`)
 
-- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 29개, `UIViewTests` 4개, `UIAutoMapperTests` 16개, `SoundManagerTests` 19개, `UISettingsTests` 5개, `SaveServiceTests` 15개, `PoolManagerTests` 8개, `StateMachineTests` 7개, `TimingTests` 11개, `TweenTests` 39개, `InputServiceTests` 5개, `GameplayTests` 10개, `DebuggingTests` 8개, `AdServiceTests` 17개, AdMob 모듈 `AdMobSettingsTests` 3개(Unity 검증 안 됨), 게임 데이터 `SheetTableParserTests` 15개, `XlsxReaderTests` 4개, `GameDataTests` 8개, `GameDataCodeGeneratorTests` 2개, `ServiceAccountTests` 5개(.NET 하네스로 실제 실행해 34개 통과, Unity Test Runner는 아직, 총 263개).
+- **테스트 파일:** `ServiceRegistryTests` 13개, `ServicesTests` 3개, `EventBusTests` 16개(여기까지 검증됨), `SceneServiceTests` 8개, `PopupManagerTests` 29개, `UIViewTests` 4개, `UIAutoMapperTests` 16개, `SoundManagerTests` 19개, `UISettingsTests` 5개, `SaveServiceTests` 15개, `PoolManagerTests` 8개, `StateMachineTests` 7개, `TimingTests` 11개, `TweenTests` 39개, `InputServiceTests` 5개, `GameplayTests` 10개, `DebuggingTests` 8개, `AdServiceTests` 17개, AdMob 모듈 `AdMobSettingsTests` 3개(Unity 검증 안 됨), 게임 데이터 `SheetTableParserTests` 20개, `XlsxReaderTests` 4개, `GameDataTests` 10개, `GameDataCodeGeneratorTests` 3개, `ServiceAccountTests` 5개(.NET 하네스로 실제 실행해 42개 통과, Unity Test Runner는 아직), `ReddotTests` 7개(Unity 검증 안 됨). 총 278개.
 - **스크립트 실행 주의:** compile-check.ps1 실행 결과에 `| Select-Object -First N`을 붙이면 파이프라인이 멈춥니다. 그냥 실행하세요.
 - **테스트용 MonoBehaviour 위치(2026-10-27 실패에서 배움):** Editor 전용 어셈블리의 MonoBehaviour는 `AddComponent`할 수 없습니다("Can't add script behaviour ... because it is an editor script"). 그래서 테스트용 컴포넌트는 런타임 테스트 어셈블리 `Tests/Runtime/TestComponents/`(네임스페이스 `Nyonyo.Framework.Tests`)에 둡니다. Editor 테스트 asmdef가 이 어셈블리를 참조합니다. ScriptableObject(`TestItemTable`)는 Editor 어셈블리에 있어도 됩니다. 외부 컴파일로는 잡을 수 없는 문제입니다.
 - **PowerShell로 파일을 수정하지 말 것(2026-10-27 사고):** PowerShell 5.1의 `Get-Content -Raw`는 BOM 없는 UTF-8을 CP949로 읽어서 한글을 깨뜨립니다. 소스 파일 수정은 반드시 Edit/Write 도구로 하세요. 이번에 깨진 테스트 파일 4개는 git checkout으로 되돌렸습니다. `FakeAssetLoader`(Tests/Editor)는 로드와 반환을 기록하는 가짜 로더입니다. 실제 Addressables 로드와 `AssetLoader`는 자동 테스트가 없습니다.

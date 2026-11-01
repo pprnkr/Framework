@@ -4,15 +4,20 @@ using System.Text;
 namespace Nyonyo.Framework.Editor.Data
 {
     /// <summary>
-    /// 시트 하나를 해석한 결과입니다. 첫 번째 속성이 유니크 키입니다.
+    /// 시트 하나를 해석한 결과입니다.
     /// </summary>
+    /// <remarks>
+    /// 일반 시트는 첫 번째 속성이 유니크 키이고, 행마다 값이 하나씩 있습니다.
+    /// Config 시트(<see cref="IsConfig"/>)는 시트의 Key가 속성이 되고, <see cref="Rows"/>에 행이 하나만 있습니다.
+    /// </remarks>
     internal sealed class SheetTable
     {
-        public SheetTable(string name, IReadOnlyList<SheetField> fields, IReadOnlyList<object[]> rows)
+        public SheetTable(string name, IReadOnlyList<SheetField> fields, IReadOnlyList<object[]> rows, bool isConfig = false)
         {
             Name = name;
             Fields = fields;
             Rows = rows;
+            IsConfig = isConfig;
             SchemaHash = ComputeSchemaHash();
         }
 
@@ -23,8 +28,12 @@ namespace Nyonyo.Framework.Editor.Data
 
         public string TableClassName => Name + "Table";
 
+        /// <summary>Type, Key, Value 열로 값을 아래로 적는 Config 시트인지 여부입니다.</summary>
+        public bool IsConfig { get; }
+
         public IReadOnlyList<SheetField> Fields { get; }
 
+        /// <summary>일반 시트의 유니크 키(첫 번째 속성)입니다. Config 시트에는 쓰지 않습니다.</summary>
         public SheetField Key => Fields[0];
 
         /// <summary>
@@ -38,6 +47,8 @@ namespace Nyonyo.Framework.Editor.Data
         private long ComputeSchemaHash()
         {
             var text = new StringBuilder(Name);
+            if (IsConfig)
+                text.Append("|config");
             foreach (var field in Fields)
                 text.Append('|').Append(field.Name).Append(':').Append(field.Type.Describe());
 
