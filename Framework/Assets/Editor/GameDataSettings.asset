@@ -12,7 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 46fb5d9f9bd63994b875d2fc1ba2762e, type: 3}
   m_Name: GameDataSettings
   m_EditorClassIdentifier: Nyonyo.Framework.Editor::Nyonyo.Framework.Editor.Data.GameDataSettings
-  _spreadsheets: []
+  _spreadsheets:
+  - _spreadsheet: 
+    _sheets: []
   _codeFolder: Assets/GameData/Generated
   _namespace: Game.Data
   _className: GameData
